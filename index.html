@@ -2,21 +2,108 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>Free Kick Hero</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Free Kick Hero 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@1,700;1,800;1,900&family=Barlow:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; height: 100%; background: #07140c; overflow: hidden; overscroll-behavior: none; }
-  body { display: flex; align-items: center; justify-content: center; }
-  canvas {
-    display: block;
-    touch-action: none;            /* lets you drag with a finger without scrolling the page */
-    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-    border-radius: 10px;
+  :root {
+    --red: #d7192d;
+    --blue: #1d5fc0;
+    --gold: #ffd23f;
+    --ink: rgba(7, 12, 28, .62);
+    --display: "Barlow Condensed", "Arial Narrow", Impact, system-ui, sans-serif;
+    --text: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #060b1a; overflow: hidden; overscroll-behavior: none; }
+  body { font-family: var(--text); color: #fff; -webkit-tap-highlight-color: transparent; }
+  #stage { position: fixed; inset: 0; overflow: hidden; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #fx {
+    touch-action: none;            /* drag with a finger without scrolling the page */
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    cursor: grab;
+  }
+  #hud { position: absolute; left: 0; right: 0; top: 0; padding: 10px 12px 0; pointer-events: none; }
+  .bar {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+    background: var(--ink); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    border-radius: 14px; padding: 8px 12px;
+  }
+  .teams { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 10px;
+    font: italic 800 15px/1 var(--display); letter-spacing: .04em; }
+  .teams i { font-style: normal; opacity: .55; font-weight: 600; }
+  .chip { width: 22px; height: 8px; border-radius: 4px; }
+  .chip.red { background: var(--red); } .chip.blue { background: var(--blue); }
+  .stat { font: italic 800 22px/1 var(--display); }
+  .stat small { font: 600 11px/1 var(--text); opacity: .7; margin-right: 5px; }
+  .stat.r { text-align: right; }
+  #pips { display: flex; gap: 6px; }
+  .pip { width: 11px; height: 11px; border-radius: 50%; background: rgba(255,255,255,.25); transition: background .2s; }
+  .pip.goal { background: #3ddc84; } .pip.miss { background: #ff5560; }
+  #banner { position: absolute; left: 0; right: 0; top: 15%; text-align: center; pointer-events: none; opacity: 0; }
+  #banner.show { animation: pop .42s cubic-bezier(.2, 1.4, .4, 1) forwards; }
+  #banner h1 {
+    margin: 0; font: italic 900 clamp(48px, 17vw, 96px)/.9 var(--display); letter-spacing: .01em;
+    text-shadow: 0 4px 0 rgba(0,0,0,.45), 0 0 28px rgba(0,0,0,.5);
+  }
+  #banner p { margin: 8px 0 0; font: 600 17px/1.2 var(--text); text-shadow: 0 2px 8px rgba(0,0,0,.8); }
+  #banner small { display: block; margin-top: 14px; font: 600 12px/1 var(--text); opacity: .75; }
+  @keyframes pop { from { opacity: 0; transform: scale(.55); } to { opacity: 1; transform: scale(1); } }
+  #hint {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: 92%;
+    background: var(--ink); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    padding: 9px 16px; border-radius: 999px; font: 600 14px/1.3 var(--text); text-align: center;
+    pointer-events: none; transition: opacity .25s; white-space: nowrap;
+  }
+  #hint.hide { opacity: 0; }
+  #over {
+    position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(4, 8, 20, .82); text-align: center; padding: 20px;
+  }
+  #over.show { display: flex; }
+  #over h2 { margin: 0; font: italic 900 56px/1 var(--display); }
+  #over .score { font: italic 900 108px/1 var(--display); color: var(--gold); margin: 10px 0 4px; }
+  #over p { margin: 4px 0; font: 600 17px/1.3 var(--text); }
+  #over p.dim { opacity: .65; font-size: 14px; }
+  #again {
+    margin-top: 26px; border: 0; border-radius: 999px; padding: 15px 44px; background: var(--red); color: #fff;
+    font: italic 800 24px/1 var(--display); letter-spacing: .03em; cursor: pointer;
+  }
+  #again:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  #fallback { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 30px;
+    text-align: center; font: 600 17px/1.4 var(--text); background: #060b1a; }
+  @media (prefers-reduced-motion: reduce) { #banner.show { animation: none; opacity: 1; } }
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <canvas id="fx"></canvas>
+  <div id="hud">
+    <div class="bar">
+      <div class="teams"><span class="chip red"></span><span id="tHome">FC TWENTE</span><i>v</i><span id="tAway">SC HEERENVEEN</span><span class="chip blue"></span></div>
+      <div class="stat"><small>Goals</small><span id="goals">0</span></div>
+      <div id="pips" aria-hidden="true"></div>
+      <div class="stat r"><small>Shot</small><span id="shotn">1</span>/<span id="shotsTotal">5</span></div>
+    </div>
+  </div>
+  <div id="banner" role="status"><h1 id="bTitle"></h1><p id="bSub"></p><small id="bTap">Tap to continue</small></div>
+  <div id="hint"></div>
+  <div id="over">
+    <h2>FULL TIME</h2>
+    <div class="score" id="oScore">0/5</div>
+    <p id="oMsg"></p>
+    <p class="dim" id="oBest"></p>
+    <button id="again" type="button">Play again</button>
+  </div>
+  <div id="fallback">This game needs WebGL. Try a recent version of Chrome, Safari, Edge or Firefox.</div>
+</div>
+
+<!-- app.py inlines three.min.js here. Opening this file directly loads it from the same folder. -->
+<script src="three.min.js"></script>
 
 <!-- app.py replaces this placeholder with the settings picked in the Streamlit sidebar.
      When you open this file directly in a browser the defaults below are used. -->
@@ -27,773 +114,1048 @@
 'use strict';
 
 /* ======================================================================
-   SETTINGS  (everything you might want to tweak lives here)
+   SETTINGS - everything you might want to tweak lives up here
    ====================================================================== */
 const CFG = Object.assign({
   shots: 5,                 // free kicks per round
   keeperSkill: 3,           // 1 (easy) .. 5 (hard)
-  playerName: 'Ørjasæter',  // label under the striker
+  playerName: 'Ørjasæter',  // printed on the back of the shirt
   homeTeam: 'FC TWENTE',
   awayTeam: 'SC HEERENVEEN'
 }, window.GAME_CONFIG || {});
 
-const W = 480, H = 800;                 // logical game size (scaled to fit any screen)
-const GOAL = { l: 140, r: 340, y: 110 };// goal posts (x) and goal line (y)
-const NET_TOP = 58, NET_BACK = 76;      // visual top of the net, back of the net (ball stops here)
-const POST_R = 7;                       // post "thickness" for hit detection
-const BALL_R = 9;                       // ball radius (collision)
-const WALL_R = 13;                      // wall player radius (collision)
-const WALL_GAP = 32;                    // distance between wall players
-const WALL_DIST = 225;                  // distance ball -> wall
-const GRAB = 70;                        // how close to the ball you must start dragging
-const SHOTS = clamp(Math.round(CFG.shots), 1, 20);
-const SKILL = clamp(CFG.keeperSkill, 1, 5);
-
-const KIT_HOME = { shirt: '#d6201f', stripe: null, shorts: '#ffffff', socks: '#d6201f', shoes: '#111', trim: '#ffffff' };
-const KIT_AWAY = { shirt: '#1b57b8', stripe: '#ffffff', shorts: '#ffffff', socks: '#1b57b8', shoes: '#222', trim: '#1b57b8' };
-const KIT_GK   = { shirt: '#c6ee14', stripe: null, shorts: '#1a1a1a', socks: '#1a1a1a', shoes: '#ff6a00', trim: '#1a1a1a', gloves: '#ff6a00' };
-const SKINS = ['#f1c9a5', '#e0ac85', '#c68863', '#8d5a3b', '#f6d7bb'];
-const HAIRS = ['#2b1d12', '#5a3a1e', '#b88a4a', '#111', '#8a8a8a'];
-
-/* ======================================================================
-   HELPERS
-   ====================================================================== */
-function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
-const depth = y => 0.6 + 0.6 * (y / H);           // things lower on screen are drawn bigger
-const easeOutBack = t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
 const easeOut = t => 1 - Math.pow(1 - t, 3);
+const SHOTS = clamp(Math.round(CFG.shots), 1, 20);
+const SKILL = clamp(CFG.keeperSkill, 1, 5);
+
+// World units are metres. The goal line is z = 0, the goal is centred on x = 0,
+// the pitch runs towards +z, and the camera looks along -z.
+const R = 0.11;                         // ball radius used for collisions
+const VR = 0.17;                        // ball radius drawn (a bit bigger so it reads from far away)
+const GW = 7.32, GH = 2.44, HALF = GW / 2, POST = 0.06;   // real goal size
+const NET_BACK = 2.1, NET_TOP_BACK = 1.4;
+const WALL_DIST = 9.15, WALL_SP = 0.55, WALL_R = 0.3, WALL_H = 1.86;
+const KEEPER_Z = 0.35;
+const CAM_BACK = 4.6, CAM_H = 2.15, LOOK_Y = -1.1;         // camera sits behind the ball, looking at the goal
+const GRAB_PX = 0.13;                   // grab radius around the ball, as a fraction of the shortest screen side
+const KICK_DELAY = 0.14;                // seconds between release and the ball leaving the boot
+
+const V3 = THREE.Vector3;
+const UP = new V3(0, 1, 0);
 
 /* ======================================================================
-   CANVAS SETUP
+   RENDERER, SCENE, CAMERA
    ====================================================================== */
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const S = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
-canvas.width = W * S; canvas.height = H * S;
-
-function resize() {
-  if (!window.innerWidth || !window.innerHeight) return;
-  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
-  canvas.style.width = Math.floor(W * s) + 'px';
-  canvas.style.height = Math.floor(H * s) + 'px';
+const $ = id => document.getElementById(id);
+const glCanvas = $('gl'), fx = $('fx'), fctx = fx.getContext('2d');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, powerPreference: 'high-performance' });
+} catch (err) {
+  $('fallback').style.display = 'flex';
+  return;
 }
-window.addEventListener('resize', resize);
-resize();
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0b1433, 75, 230);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+
+let W = 1, H = 1, DPR = 1;
+function resize() {
+  W = Math.max(1, window.innerWidth); H = Math.max(1, window.innerHeight);
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(W, H, false);
+  fx.width = Math.round(W * DPR); fx.height = Math.round(H * DPR);
+  fctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const aspect = W / H;
+  // keep roughly 38 degrees of horizontal view on tall screens so the goal always fits
+  const vf = 2 * Math.atan(Math.tan(19 * Math.PI / 180) / aspect);
+  camera.fov = clamp(THREE.MathUtils.radToDeg(vf), 38, 62);
+  camera.aspect = aspect;
+  camera.updateProjectionMatrix();
+  if (typeof placeCamera === 'function' && state !== 'shot') { placeCamera(); computeReference(); }
+}
+
+/* ======================================================================
+   TEXTURES (all drawn on canvases, so the project has no image files)
+   ====================================================================== */
+function canvasTex(w, h, draw, opts = {}) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); draw(g, w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = maxAniso;
+  if (opts.repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+  return t;
+}
+
+const PITCH_W = 68, PITCH_Z0 = -6, PITCH_Z1 = 54;       // pitch texture covers x -34..34, z -6..54
+function makePitchTexture() {
+  const S = 30;                                           // pixels per metre
+  const w = PITCH_W * S, h = (PITCH_Z1 - PITCH_Z0) * S;
+  return canvasTex(w, h, (g) => {
+    const stripe = 5.5 * S;
+    for (let y = 0, i = 0; y < h; y += stripe, i++) {
+      g.fillStyle = i % 2 ? '#2f8a3c' : '#379944';
+      g.fillRect(0, y, w, stripe);
+    }
+    for (let i = 0; i < 26000; i++) {                     // grass grain
+      g.fillStyle = Math.random() < .5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.04)';
+      g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 1);
+    }
+    const X = x => (x + PITCH_W / 2) * S, Z = z => (z - PITCH_Z0) * S;
+    g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 0.13 * S; g.lineJoin = 'miter';
+    g.beginPath(); g.moveTo(X(-34), Z(0)); g.lineTo(X(34), Z(0)); g.stroke();                       // goal line
+    g.beginPath(); g.moveTo(X(-34), Z(0)); g.lineTo(X(-34), Z(PITCH_Z1)); g.stroke();               // touchlines
+    g.beginPath(); g.moveTo(X(34), Z(0)); g.lineTo(X(34), Z(PITCH_Z1)); g.stroke();
+    g.strokeRect(X(-20.16), Z(0), 40.32 * S, 16.5 * S);                                             // penalty area
+    g.strokeRect(X(-9.16), Z(0), 18.32 * S, 5.5 * S);                                               // six-yard box
+    g.fillStyle = 'rgba(255,255,255,.95)';
+    g.beginPath(); g.arc(X(0), Z(11), 0.2 * S, 0, Math.PI * 2); g.fill();                           // penalty spot
+    const a = Math.acos(5.5 / 9.15);                                                                // penalty arc
+    g.beginPath(); g.arc(X(0), Z(11), 9.15 * S, Math.PI / 2 - a, Math.PI / 2 + a); g.stroke();
+  });
+}
+
+function makeCrowdTexture() {
+  return canvasTex(1024, 512, (g, w, h) => {
+    g.fillStyle = '#10141f'; g.fillRect(0, 0, w, h);
+    const cols = ['#d7192d', '#e8e8ee', '#1d5fc0', '#f2c744', '#7c8394', '#2b3347', '#fff', '#c41a2a', '#1b4a98'];
+    for (let row = 0; row < 64; row++) {
+      const y = row * 8 + 4;
+      g.fillStyle = row % 8 === 7 ? 'rgba(0,0,0,.55)' : 'rgba(0,0,0,0)'; g.fillRect(0, row * 8, w, 8);  // aisles
+      for (let x = (row % 2) * 5; x < w; x += 10) {
+        const c = Math.random() < 0.18 ? '#272f42' : pick(cols);
+        g.fillStyle = c; g.fillRect(x + 1, y, 8, 5);                                                // torso
+        g.fillStyle = pick(['#f1c9a5', '#d9a47f', '#a8714b', '#6e4730']);
+        g.beginPath(); g.arc(x + 5, y - 1.2, 2.3, 0, Math.PI * 2); g.fill();                         // head
+      }
+    }
+  }, { repeat: true });
+}
+
+function makeAdTexture() {
+  return canvasTex(2048, 128, (g, w, h) => {
+    const items = [
+      ['#d7192d', '#fff', CFG.homeTeam],
+      ['#f4f4f6', '#1d5fc0', 'FREE KICK HERO'],
+      ['#1d5fc0', '#fff', CFG.awayTeam],
+      ['#0d1426', '#ffd23f', 'ENSCHEDE  -  HEERENVEEN']
+    ];
+    const seg = w / 8;
+    for (let i = 0; i < 8; i++) {
+      const [bg, fg, t] = items[i % items.length];
+      g.fillStyle = bg; g.fillRect(i * seg, 0, seg, h);
+      g.fillStyle = fg; g.font = 'italic 800 52px "Barlow Condensed", Impact, "Arial Narrow", sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(t, i * seg + seg / 2, h / 2 + 2, seg - 24);
+    }
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(0, h - 10, w, 10);
+  });
+}
+
+function makeNetTexture() {
+  return canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(0, 1.5); g.lineTo(w, 1.5); g.moveTo(1.5, 0); g.lineTo(1.5, h); g.stroke();
+  }, { repeat: true });
+}
+
+function makeBallTexture() {
+  return canvasTex(512, 256, (g, w, h) => {
+    g.fillStyle = '#f7f7f4'; g.fillRect(0, 0, w, h);
+    const phi = (1 + Math.sqrt(5)) / 2;                                    // dark patches at the 12 icosahedron corners
+    const dirs = [];
+    [[0, 1, phi], [0, -1, phi], [0, 1, -phi], [0, -1, -phi]].forEach(v => dirs.push(v));
+    [[1, phi, 0], [-1, phi, 0], [1, -phi, 0], [-1, -phi, 0]].forEach(v => dirs.push(v));
+    [[phi, 0, 1], [-phi, 0, 1], [phi, 0, -1], [-phi, 0, -1]].forEach(v => dirs.push(v));
+    g.fillStyle = '#1b1f27';
+    for (const d of dirs) {
+      const l = Math.hypot(...d), x = d[0] / l, y = d[1] / l, z = d[2] / l;
+      const u = (Math.atan2(x, z) / (2 * Math.PI) + 0.5) * w, v = (0.5 - Math.asin(y) / Math.PI) * h;
+      const sx = 34 / Math.max(0.25, Math.cos(Math.asin(y))), sy = 34;
+      for (const off of [-w, 0, w]) {
+        g.beginPath(); g.ellipse(u + off, v, sx, sy, 0, 0, Math.PI * 2); g.fill();
+      }
+    }
+  });
+}
+
+function makeGlowTexture() {
+  return canvasTex(128, 128, (g, w, h) => {
+    const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = r; g.fillRect(0, 0, w, h);
+  });
+}
+
+/* ======================================================================
+   STADIUM
+   ====================================================================== */
+const lights = {};
+function buildStadium() {
+  // sky dome with a soft horizon glow and a few stars
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(420, 24, 14),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: 'varying vec3 vP; void main(){ float h = clamp(normalize(vP).y, 0.0, 1.0);' +
+        'vec3 c = mix(vec3(0.16,0.22,0.43), vec3(0.015,0.03,0.09), pow(h, 0.5)); gl_FragColor = vec4(c, 1.0); }'
+    })
+  );
+  scene.add(sky);
+  const starGeo = new THREE.BufferGeometry(), sp = [];
+  for (let i = 0; i < 260; i++) {
+    const th = Math.random() * Math.PI * 2, ph = Math.random() * 1.1 + 0.25;
+    sp.push(Math.sin(ph) * Math.cos(th) * 400, Math.cos(ph) * 400, Math.sin(ph) * Math.sin(th) * 400);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 1.6, color: 0xdfe8ff, sizeAttenuation: false, fog: false })));
+
+  // lights
+  scene.add(new THREE.HemisphereLight(0xaec2ff, 0x1e3a22, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff1dc, 1.25);
+  sun.position.set(-18, 34, 30);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  const sc = sun.shadow.camera; sc.left = -22; sc.right = 22; sc.top = 24; sc.bottom = -24; sc.near = 5; sc.far = 120;
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+  scene.add(sun); scene.add(sun.target);
+  lights.sun = sun;
+  const fill = new THREE.DirectionalLight(0x9db8ff, 0.35);
+  fill.position.set(25, 12, 10); scene.add(fill);
+
+  // pitch
+  const pitchTex = makePitchTexture();
+  const pitch = new THREE.Mesh(
+    new THREE.PlaneGeometry(PITCH_W, PITCH_Z1 - PITCH_Z0),
+    new THREE.MeshStandardMaterial({ map: pitchTex, roughness: 1, metalness: 0 })
+  );
+  pitch.rotation.x = -Math.PI / 2; pitch.position.set(0, 0, (PITCH_Z0 + PITCH_Z1) / 2);
+  pitch.receiveShadow = true; scene.add(pitch);
+  const apron = new THREE.Mesh(                                 // dark grass beyond the touchlines and goal line
+    new THREE.PlaneGeometry(400, 400),
+    new THREE.MeshStandardMaterial({ color: 0x1c4a26, roughness: 1 })
+  );
+  apron.rotation.x = -Math.PI / 2; apron.position.set(0, -0.02, 20); apron.receiveShadow = true; scene.add(apron);
+
+  // crowd + stands behind the goal and along the sides
+  const crowdTex = makeCrowdTexture();
+  const crowdMat = (rx, ry) => {
+    const t = crowdTex.clone(); t.needsUpdate = true; t.repeat.set(rx, ry); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding;
+    return new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.42, roughness: 1 });
+  };
+  const concrete = new THREE.MeshStandardMaterial({ color: 0x1a2030, roughness: 1 });
+  function stand(width, x, z, rotY, depth = 24, rise = 14, start = 0) {
+    const g = new THREE.Group();
+    const len = Math.hypot(depth, rise);
+    const slope = new THREE.Mesh(new THREE.PlaneGeometry(width, len), crowdMat(width / 40, len / 14));
+    slope.rotation.x = -(Math.PI / 2 - Math.atan2(rise, depth));           // tilt back, away from the pitch
+    slope.position.set(0, rise / 2 + 1.0, -(depth / 2) - start);
+    g.add(slope);
+    const front = new THREE.Mesh(new THREE.BoxGeometry(width, 1.6, 0.6), concrete);
+    front.position.set(0, 0.8, -start); g.add(front);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(width, 0.7, depth * 0.62), concrete);
+    roof.position.set(0, rise + 5.2, -(depth * 0.72) - start); g.add(roof);
+    for (let i = 0; i < Math.floor(width / 6); i++) {                       // glowing roof lamps
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 0.5), new THREE.MeshBasicMaterial({ color: 0xfff4d6, fog: false }));
+      lamp.position.set(-width / 2 + 3 + i * 6, rise + 4.7, -(depth * 0.4) - start); g.add(lamp);
+    }
+    g.position.set(x, 0, z); g.rotation.y = rotY;
+    scene.add(g);
+  }
+  stand(130, 0, -7.5, 0);                         // behind the goal
+  stand(90, -37, 25, Math.PI / 2, 20, 12, 0);     // left
+  stand(90, 37, 25, -Math.PI / 2, 20, 12, 0);     // right
+
+  // advertising boards
+  const adTex = makeAdTexture();
+  const adMat = new THREE.MeshStandardMaterial({ map: adTex, emissive: 0xffffff, emissiveMap: adTex, emissiveIntensity: 0.7, roughness: 0.6 });
+  function board(len, x, z, rotY) {
+    const t = adTex.clone(); t.needsUpdate = true; t.wrapS = THREE.RepeatWrapping; t.repeat.set(len / 40, 1);
+    const m = adMat.clone(); m.map = t; m.emissiveMap = t;
+    const b = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.95), m);
+    b.position.set(x, 0.5, z); b.rotation.y = rotY; scene.add(b);
+  }
+  board(78, 0, -6.2, 0);
+  board(70, -35.4, 28, Math.PI / 2);
+  board(70, 35.4, 28, -Math.PI / 2);
+
+  // floodlight towers beyond the far stand
+  const glow = makeGlowTexture();
+  [[-24, -36], [24, -36], [-60, 10], [60, 10]].forEach(([x, z]) => {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 46, 8), concrete);
+    pole.position.set(x, 23, z); scene.add(pole);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(9, 5, 1), new THREE.MeshBasicMaterial({ color: 0xfffbe6, fog: false }));
+    head.position.set(x, 47, z); head.lookAt(0, 47, 30); scene.add(head);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xfff1c9, transparent: true, opacity: 0.9, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+    s.scale.set(46, 46, 1); s.position.set(x, 47, z + 1); scene.add(s);
+  });
+}
+
+/* ======================================================================
+   GOAL
+   ====================================================================== */
+const goalNets = [];
+function buildGoal() {
+  const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+  const post = (x) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(POST, POST, GH, 12), white);
+    m.position.set(x, GH / 2, 0); m.castShadow = true; scene.add(m);
+  };
+  post(-HALF); post(HALF);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(POST, POST, GW + POST * 2, 12), white);
+  bar.rotation.z = Math.PI / 2; bar.position.set(0, GH, 0); bar.castShadow = true; scene.add(bar);
+
+  // back frame: stays slim so the net reads clearly
+  const back = new THREE.MeshStandardMaterial({ color: 0xdfe4ee, roughness: 0.5 });
+  const rod = (a, b) => {
+    const len = a.distanceTo(b);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, len, 6), back);
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(UP, b.clone().sub(a).normalize());
+    scene.add(m);
+  };
+  [-HALF, HALF].forEach(x => {
+    rod(new V3(x, GH, 0), new V3(x, GH - 0.25, -NET_TOP_BACK));
+    rod(new V3(x, GH - 0.25, -NET_TOP_BACK), new V3(x, 0.02, -NET_BACK));
+    rod(new V3(x, 0.02, -NET_BACK), new V3(x, 0.02, 0));
+  });
+  rod(new V3(-HALF, GH - 0.25, -NET_TOP_BACK), new V3(HALF, GH - 0.25, -NET_TOP_BACK));
+  rod(new V3(-HALF, 0.02, -NET_BACK), new V3(HALF, 0.02, -NET_BACK));
+
+  // net panels (UVs in metres so the mesh cells stay the same size everywhere)
+  const netTex = makeNetTexture();
+  const netMat = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, opacity: 0.8 });
+  netTex.repeat.set(1, 1);
+  netMat.map.wrapS = netMat.map.wrapT = THREE.RepeatWrapping;
+  function quad(a, b, c, d) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([...a.toArray(), ...b.toArray(), ...c.toArray(), ...d.toArray()], 3));
+    const w = a.distanceTo(b) * 8, h = a.distanceTo(d) * 8;
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, w, 0, w, h, 0, h], 2));
+    geo.setIndex([0, 1, 2, 0, 2, 3]);
+    const m = new THREE.Mesh(geo, netMat); m.renderOrder = 5; scene.add(m);
+  }
+  const tl = (x, y, z) => new V3(x, y, z);
+  quad(tl(-HALF, GH, 0), tl(HALF, GH, 0), tl(HALF, GH - 0.25, -NET_TOP_BACK), tl(-HALF, GH - 0.25, -NET_TOP_BACK));  // roof
+  quad(tl(-HALF, GH - 0.25, -NET_TOP_BACK), tl(HALF, GH - 0.25, -NET_TOP_BACK), tl(HALF, 0, -NET_BACK), tl(-HALF, 0, -NET_BACK)); // back
+  [-HALF, HALF].forEach(x => {                                                                                    // sides
+    quad(tl(x, 0, 0), tl(x, 0, -NET_BACK), tl(x, GH - 0.25, -NET_TOP_BACK), tl(x, GH, 0));
+  });
+  // dark patch behind the net so it reads against the grass
+  const shade = new THREE.Mesh(new THREE.PlaneGeometry(GW, 0.01), new THREE.MeshBasicMaterial({ visible: false }));
+  scene.add(shade);
+}
+
+/* ======================================================================
+   PEOPLE (simple stylised players built from primitives)
+   ====================================================================== */
+const H0 = 0.95;                                   // hip pivot height; "body" rotates around this point
+function shirtTexture(kind, name) {
+  return canvasTex(512, 256, (g, w, h) => {
+    if (kind === 'twente') {
+      g.fillStyle = '#d7192d'; g.fillRect(0, 0, w, h);
+      g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(0, 0, w, 14);
+      if (name) {
+        g.fillStyle = '#fff'; g.font = '700 30px Impact, "Arial Narrow", "Barlow Condensed", Arial, sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        const label = name.toUpperCase(), fit = Math.min(1, 118 / g.measureText(label).width);
+        for (const cx of [0, w]) {                                                              // the back of the shirt is u = 0 / 1
+          g.save(); g.translate(cx, 70); g.scale(fit, 1); g.fillText(label, 0, 0); g.restore();
+        }
+      }
+    } else if (kind === 'heerenveen') {
+      const n = 16, sw = w / n;
+      for (let i = 0; i < n; i++) { g.fillStyle = i % 2 ? '#f3f5fa' : '#1d5fc0'; g.fillRect(i * sw, 0, sw, h); }
+    } else {
+      g.fillStyle = '#c5f01a'; g.fillRect(0, 0, w, h);
+      g.fillStyle = 'rgba(0,0,0,.12)'; for (let i = 0; i < 8; i++) g.fillRect(i * 64 + 40, 0, 10, h);
+    }
+  }, { repeat: true });
+}
+const kits = {
+  twente:     { tex: null, shirt: 0xd7192d, shorts: 0xf4f4f4, socks: 0xd7192d, boots: 0x15171c },
+  heerenveen: { tex: null, shirt: 0x1d5fc0, shorts: 0xf4f4f4, socks: 0x1d5fc0, boots: 0x1a1d24 },
+  keeper:     { tex: null, shirt: 0xc5f01a, shorts: 0x15171c, socks: 0x15171c, boots: 0xff6a00, gloves: 0xff6a00 }
+};
+
+function makePerson(kitName, opts = {}) {
+  const kit = kits[kitName];
+  const skin = new THREE.MeshStandardMaterial({ color: opts.skin || 0xe6b794, roughness: 0.8 });
+  const mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 });
+  const shirtMap = shirtTexture(kitName, opts.name);
+  const shirtSide = new THREE.MeshStandardMaterial({ map: shirtMap, roughness: 0.85 });
+  const shirtFlat = mat(kit.shirt);
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = H0; root.add(body);
+  const add = (parent, geo, material, x, y, z, shadow = true) => {
+    const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = shadow; parent.add(m); return m;
+  };
+  const cyl = (rt, rb, h, seg = 10) => new THREE.CylinderGeometry(rt, rb, h, seg);
+
+  // legs (pivot at the hip)
+  const legs = [-1, 1].map(side => {
+    const leg = new THREE.Group(); leg.position.set(side * 0.1, 0.92 - H0, 0); body.add(leg);
+    add(leg, cyl(0.098, 0.086, 0.3), mat(kit.shorts), 0, -0.15, 0);
+    add(leg, cyl(0.074, 0.068, 0.17), skin, 0, -0.385, 0);
+    add(leg, cyl(0.067, 0.06, 0.42), mat(kit.socks), 0, -0.68, 0);
+    add(leg, new THREE.BoxGeometry(0.1, 0.07, 0.27), mat(kit.boots), 0, -0.885, -0.06);
+    return leg;
+  });
+  const hips = add(body, cyl(0.185, 0.2, 0.2, 14), mat(kit.shorts), 0, 0.98 - H0, 0); hips.scale.set(1.15, 1, 0.78);
+  const torso = add(body, new THREE.CylinderGeometry(0.215, 0.18, 0.56, 20, 1), [shirtSide, shirtFlat, shirtFlat], 0, 1.27 - H0, 0);
+  torso.scale.set(1.12, 1, 0.7);
+
+  // arms (pivot at the shoulder)
+  const arms = [-1, 1].map(side => {
+    const arm = new THREE.Group(); arm.position.set(side * 0.27, 1.5 - H0, 0); body.add(arm);
+    add(arm, new THREE.SphereGeometry(0.07, 10, 8), shirtFlat, 0, 0, 0);
+    add(arm, cyl(0.058, 0.052, 0.25), kitName === 'heerenveen' ? shirtSide : shirtFlat, 0, -0.125, 0);
+    add(arm, cyl(0.045, 0.04, 0.26), skin, 0, -0.37, 0);
+    add(arm, new THREE.SphereGeometry(kit.gloves ? 0.072 : 0.05, 10, 8), kit.gloves ? mat(kit.gloves) : skin, 0, -0.53, 0);
+    return arm;
+  });
+
+  // head
+  const head = new THREE.Group(); head.position.set(0, 1.71 - H0, 0); body.add(head);
+  add(body, cyl(0.05, 0.055, 0.1), skin, 0, 1.59 - H0, 0, false);
+  add(head, new THREE.SphereGeometry(0.115, 18, 14), skin, 0, 0, 0);
+  const hair = add(head, new THREE.SphereGeometry(0.123, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.56), mat(opts.hair || 0x5a3a1e), 0, 0.012, 0.004);
+  hair.rotation.x = -0.28;
+  const eyeMat = mat(0x1a1a1a);
+  [-1, 1].forEach(s => add(head, new THREE.SphereGeometry(0.014, 6, 6), eyeMat, s * 0.04, 0.01, -0.108, false));
+
+  root.userData = { body, legs, arms, head, torso };
+  if (opts.scale) root.scale.setScalar(opts.scale);
+  return root;
+}
+
+function faceToward(obj, x, z) {          // models face -z by default
+  obj.rotation.y = Math.atan2(-(x - obj.position.x), -(z - obj.position.z));
+}
+
+/* ======================================================================
+   BALL & TRAIL
+   ====================================================================== */
+let ballMesh, trailSprites = [], trailHist = [];
+function buildBall() {
+  ballMesh = new THREE.Mesh(new THREE.SphereGeometry(VR, 24, 16), new THREE.MeshStandardMaterial({ map: makeBallTexture(), roughness: 0.45 }));
+  ballMesh.castShadow = true; scene.add(ballMesh);
+  const glow = makeGlowTexture();
+  for (let i = 0; i < 16; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+    s.visible = false; scene.add(s); trailSprites.push(s);
+  }
+}
 
 /* ======================================================================
    GAME STATE
    ====================================================================== */
-let state = 'aim';        // aim | drawing | shot | loose | over
-let attempt = 0;          // finished shots
-let goals = 0;
-let shotLog = [];         // 'goal' | 'miss' for each finished shot
-let result = null;        // goal | saved | blocked | wide | post
-let resultT = 0;
-let time = 0, shake = 0;
-let ball, wall = [], keeper, striker;
-let raw = [], drawStart = 0;
-let path = null, shotS = 0, shotSpeed = 700, shotT = 0;
-let trail = [], confetti = [];
-let hintMsg = '', hintT = 0;
+let state = 'aim';              // aim | drawing | shot | result | over
+let attempt = 0, goals = 0, shotLog = [];
+let result = null, resultT = 0, time = 0, shake = 0, slowmo = 1;
 let best = 0;
-try { best = parseInt(localStorage.getItem('fkh_best') || '0', 10) || 0; } catch (e) { /* storage may be blocked */ }
+try { best = parseInt(localStorage.getItem('fkh3d_best') || '0', 10) || 0; } catch (e) { /* storage may be blocked */ }
+
+const B = new V3();                       // ball start spot
+const A = new V3(0, 0, -1);               // unit vector from the ball towards the goal (horizontal)
+const RIGHT = new V3(1, 0, 0);
+const ball = { pos: new V3(), vel: new V3(), prev: new V3(), inNet: false };
+const camBase = new V3();
+let wall = [], keeper, striker, goalCelebrate = 0;
+let raw = [], drawStart = 0;
+let path = null, travel = 0, shotSpeed = 22, shotClock = 0;
+let ref = null;                           // screen/world reference for building shots
+let hintTimer = 0;
+
+let stadiumBuilt = false;
+
+function ensureWorld() {
+  if (stadiumBuilt) return;
+  stadiumBuilt = true;
+  buildStadium(); buildGoal(); buildBall();
+  // keeper
+  keeper = { obj: makePerson('keeper', { skin: 0xd9a47f, hair: 0x2b1d12 }), x: 0, vx: 0, targetX: 0, locked: false, committed: false, react: 0, adapt: 0, speed: 5, err: 0, lean: 0, dir: 0, jump: 0 };
+  scene.add(keeper.obj);
+  striker = { obj: makePerson('twente', { name: CFG.playerName, skin: 0xedc3a0, hair: 0xb98a4c }), t: -1, start: new V3(), end: new V3(), cel: 0 };
+  scene.add(striker.obj);
+}
 
 function newAttempt() {
-  const bx = rand(120, 360), by = rand(590, 690);
-  ball = { x: bx, y: by, vx: 0, vy: 0, spin: 0 };
+  ensureWorld();
+  const bx = rand(-9, 9), bz = rand(15.5, 20.5);
+  B.set(bx, R, bz);
+  A.set(-bx, 0, -bz).normalize();
+  RIGHT.set(-A.z, 0, A.x);
 
-  // wall stands on the line between the ball and the middle of the goal
-  const gx = (GOAL.l + GOAL.r) / 2;
-  let dx = gx - bx, dy = GOAL.y - by;
-  const len = Math.hypot(dx, dy); dx /= len; dy /= len;
-  const n = Math.min(5, 3 + Math.floor(attempt / 2));
-  const cx = bx + dx * WALL_DIST, cy = by + dy * WALL_DIST;
+  // wall on the line between ball and goal centre
+  wall.forEach(w => scene.remove(w.obj));
   wall = [];
+  const n = Math.min(5, 3 + Math.floor(attempt / 2));
+  const c = B.clone().addScaledVector(A, WALL_DIST);
+  const skins = [0xf0c8a4, 0xe0ac85, 0xc58a62, 0x8d5a3b, 0xf6d7bb];
+  const hairs = [0x2b1d12, 0x5a3a1e, 0xb88a4a, 0x111111, 0x8a8a8a];
   for (let i = 0; i < n; i++) {
-    const off = (i - (n - 1) / 2) * WALL_GAP;
-    wall.push({ x: cx - dy * off, y: cy + dx * off, skin: pick(SKINS), hair: pick(HAIRS) });
+    const o = makePerson('heerenveen', { skin: pick(skins), hair: pick(hairs), scale: rand(0.96, 1.04) });
+    const p = c.clone().addScaledVector(RIGHT, (i - (n - 1) / 2) * WALL_SP);
+    o.position.set(p.x, 0, p.z); faceToward(o, B.x, B.z);
+    const u = o.userData;
+    u.arms[0].rotation.set(0.55, 0, 0.32); u.arms[1].rotation.set(0.55, 0, -0.32);   // hands protecting the groin
+    scene.add(o);
+    wall.push({ obj: o, x: p.x, z: p.z, jump: 0 });
   }
 
-  keeper = {
-    x: gx, y: GOAL.y + 16, lean: 0,
-    err: rand(-1, 1) * (26 - 3 * SKILL),         // keeper's misjudgement
-    react: 0.36 - 0.04 * SKILL,                  // reaction time (s)
-    speed: 40 + 20 * SKILL + 6 * attempt         // sideways speed (px/s)
-  };
+  // keeper
+  Object.assign(keeper, { x: 0, vx: 0, targetX: 0, locked: false, committed: false, lean: 0, dir: 0, jump: 0,
+    react: 0.46 - 0.04 * SKILL,                     // seconds before he reads the ball's direction
+    adapt: 0.03 + 0.03 * SKILL,                     // after that he can still adjust for a short while, then he is committed
+    speed: 1.8 + 0.5 * SKILL + 0.1 * attempt,       // sideways speed (m/s)
+    err: rand(-1, 1) * (1.9 - 0.25 * SKILL) });     // misjudgement of where the ball will cross the line (m)
+  keeper.obj.position.set(0, 0, KEEPER_Z); keeper.obj.rotation.set(0, 0, 0); faceToward(keeper.obj, B.x, B.z);
 
-  striker = { sx: bx - 48, sy: by + 26, ex: bx - 15, ey: by + 5, x: bx - 48, y: by + 26, t: -1 };
+  // striker stands just behind and to the left of the ball
+  const sp = B.clone().addScaledVector(RIGHT, -1.7).addScaledVector(A, -1.3);
+  const ep = B.clone().addScaledVector(RIGHT, -0.62).addScaledVector(A, -0.4);
+  striker.start.copy(sp); striker.end.copy(ep); striker.t = -1; striker.cel = 0;
+  striker.obj.position.set(sp.x, 0, sp.z); striker.obj.rotation.set(0, 0, 0);
+  striker.obj.userData.body.rotation.set(0, 0, 0); striker.obj.userData.body.position.y = H0;
+  faceToward(striker.obj, B.x + A.x * 4, B.z + A.z * 4);
 
-  path = null; shotS = 0; shotT = 0; trail = []; raw = [];
-  result = null; resultT = 0;
+  ball.pos.copy(B); ball.vel.set(0, 0, 0); ball.inNet = false;
+  ballMesh.position.copy(B); ballMesh.quaternion.identity();
+  trailHist.length = 0; trailSprites.forEach(s => { s.visible = false; });
+  path = null; travel = 0; shotClock = 0; raw = []; result = null; resultT = 0; slowmo = 1; goalCelebrate = 0;
   state = 'aim';
+  placeCamera(); computeReference();
+  hideBanner();
+  setHint(attempt === 0 ? 'Drag from the ball and curve your shot around the wall' : 'Drag from the ball to take your free kick', true);
+  updateHUD();
 }
 
 function restart() {
   attempt = 0; goals = 0; shotLog = [];
-  confetti = [];
+  $('over').classList.remove('show');
   newAttempt();
 }
 
 /* ======================================================================
-   INPUT  (mouse + touch through pointer events)
+   CAMERA & SCREEN <-> WORLD MAPPING
    ====================================================================== */
-function toGame(e) {
-  const r = canvas.getBoundingClientRect();
-  return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+function placeCamera() {
+  camBase.copy(B).addScaledVector(A, -CAM_BACK); camBase.y = CAM_H;
+  camera.position.copy(camBase);
+  camera.lookAt(0, LOOK_Y, 0);
+  camera.updateMatrixWorld(true);
 }
-const BTN = { x: W / 2 - 110, y: 540, w: 220, h: 58 };
 
-canvas.addEventListener('pointerdown', e => {
+const _v = new V3();
+function project(p) {                                       // world -> CSS pixels
+  _v.copy(p).project(camera);
+  return { x: (_v.x * 0.5 + 0.5) * W, y: (-_v.y * 0.5 + 0.5) * H, z: _v.z };
+}
+function rayDir(px, py, out) {                              // CSS pixel -> world ray direction
+  out.set((px / W) * 2 - 1, -(py / H) * 2 + 1, 0.5).unproject(camera).sub(camera.position).normalize();
+  return out;
+}
+
+/* A drawn line on the screen only gives x and y. The depth comes from how far along the line
+   the ball is: after one "goal-distance" of drawing (the length from the ball to the middle
+   of the goal on screen) the ball reaches the goal. The depth curve is taken from a ground
+   line between the ball and the goal, so a line drawn straight at the goal rolls along the
+   grass, and a line drawn above it lifts the ball. */
+function computeReference() {
+  const ballScr = project(B);
+  const goalMid = project(new V3(0, GH / 2, 0));
+  const ballGround = project(new V3(B.x, 0, B.z));
+  const goalGround = project(new V3(0, 0, 0));
+  const L = Math.hypot(goalMid.x - ballScr.x, goalMid.y - ballScr.y);
+  const N = 48, table = [];
+  const dir = new V3();
+  const camRel = camera.position.clone().sub(B).dot(A);
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const px = lerp(ballGround.x, goalGround.x, t), py = lerp(ballGround.y, goalGround.y, t);
+    rayDir(px, py, dir);
+    const s = (0 - camera.position.y) / dir.y;
+    const gp = camera.position.clone().addScaledVector(dir, s);
+    table.push(gp.sub(B).dot(A));
+  }
+  table[0] = 0;
+  ref = { ballScr, goalMid, L, table, N, camRel, Dg: Math.hypot(B.x, B.z) };
+  table[N] = ref.Dg;
+}
+function depthAt(t) {                                       // distance along A from the ball for path fraction t
+  const { table, N } = ref;
+  if (t <= 0) return 0;
+  if (t >= 1) { const slope = (table[N] - table[N - 2]) / (2 / N); return table[N] + slope * (t - 1); }
+  const f = t * N, i = Math.floor(f);
+  return lerp(table[i], table[i + 1], f - i);
+}
+
+/* ======================================================================
+   INPUT (mouse and touch through pointer events)
+   ====================================================================== */
+function ptr(e) { const r = fx.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
+
+fx.addEventListener('pointerdown', e => {
   e.preventDefault();
-  const p = toGame(e);
+  const p = ptr(e);
   if (state === 'aim') {
-    if (dist(p.x, p.y, ball.x, ball.y) <= GRAB) {
-      state = 'drawing';
-      raw = [{ x: ball.x, y: ball.y }];
-      drawStart = performance.now();
-      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    const b = project(ball.pos);
+    if (Math.hypot(p.x - b.x, p.y - b.y) <= Math.max(52, GRAB_PX * Math.min(W, H) * 1.6)) {
+      state = 'drawing'; raw = [{ x: b.x, y: b.y }]; drawStart = performance.now();
+      try { fx.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      setHint('', false);
     } else {
-      flash('Start your drag on the ball');
+      setHint('Start your drag on the ball', true, 1800);
     }
-  } else if (state === 'loose' && resultT > 0.7) {
+  } else if (state === 'result' && resultT > 0.7) {
     nextAttempt();
-  } else if (state === 'over' && resultT > 0.4) {
-    if (p.x >= BTN.x && p.x <= BTN.x + BTN.w && p.y >= BTN.y && p.y <= BTN.y + BTN.h) restart();
   }
 });
-
-canvas.addEventListener('pointermove', e => {
+fx.addEventListener('pointermove', e => {
   if (state !== 'drawing') return;
   e.preventDefault();
-  const p = toGame(e);
-  const last = raw[raw.length - 1];
-  if (dist(p.x, p.y, last.x, last.y) > 6 && raw.length < 400) {
-    raw.push({ x: clamp(p.x, 0, W), y: clamp(p.y, 0, H) });
-  }
+  const p = ptr(e), last = raw[raw.length - 1];
+  if (Math.hypot(p.x - last.x, p.y - last.y) > 5 && raw.length < 500) raw.push({ x: clamp(p.x, 0, W), y: clamp(p.y, 0, H) });
 });
-
-function endDrag() { if (state === 'drawing') release(); }
-window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointerup', () => { if (state === 'drawing') release(); });
 window.addEventListener('pointercancel', () => { if (state === 'drawing') { state = 'aim'; raw = []; } });
-canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-function flash(msg) { hintMsg = msg; hintT = 2.2; }
+fx.addEventListener('contextmenu', e => e.preventDefault());
+$('again').addEventListener('click', restart);
 
 /* ======================================================================
    SHOT PATH
    ====================================================================== */
-function polyLen(pts) {
-  let l = 0;
-  for (let i = 1; i < pts.length; i++) l += dist(pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
-  return l;
-}
-
+function polyLen(pts) { let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return l; }
 function smooth(pts, passes) {
   let a = pts;
   for (let k = 0; k < passes; k++) {
     const b = [a[0]];
-    for (let i = 1; i < a.length - 1; i++) {
-      b.push({ x: (a[i - 1].x + a[i].x + a[i + 1].x) / 3, y: (a[i - 1].y + a[i].y + a[i + 1].y) / 3 });
-    }
-    b.push(a[a.length - 1]);
-    a = b;
+    for (let i = 1; i < a.length - 1; i++) b.push({ x: (a[i - 1].x + a[i].x + a[i + 1].x) / 3, y: (a[i - 1].y + a[i].y + a[i + 1].y) / 3 });
+    b.push(a[a.length - 1]); a = b;
   }
   return a;
 }
-
 function resample(pts, step) {
   const out = [{ x: pts[0].x, y: pts[0].y }];
   let prev = pts[0], need = step;
   for (let i = 1; i < pts.length; i++) {
     let a = prev; const b = pts[i];
-    let segLen = dist(a.x, a.y, b.x, b.y);
-    while (segLen >= need) {
-      const t = need / segLen;
-      a = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-      out.push(a);
-      segLen = dist(a.x, a.y, b.x, b.y);
-      need = step;
+    let seg = Math.hypot(b.x - a.x, b.y - a.y);
+    while (seg >= need) {
+      const t = need / seg; a = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; out.push(a);
+      seg = Math.hypot(b.x - a.x, b.y - a.y); need = step;
     }
-    need -= segLen;
-    prev = b;
+    need -= seg; prev = b;
   }
-  const lastP = pts[pts.length - 1], lastO = out[out.length - 1];
-  if (dist(lastP.x, lastP.y, lastO.x, lastO.y) > 0.5) out.push({ x: lastP.x, y: lastP.y });
+  const lp = pts[pts.length - 1], lo = out[out.length - 1];
+  if (Math.hypot(lp.x - lo.x, lp.y - lo.y) > 0.5) out.push({ x: lp.x, y: lp.y });
   return out;
 }
 
-function buildPath(pts) {
-  const P = resample(smooth(pts, 3), 4);
-  const cum = [0];
-  for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + dist(P[i - 1].x, P[i - 1].y, P[i].x, P[i].y));
-  const n = P.length - 1;
-  const from = P[Math.max(0, n - 8)];
-  let ex = P[n].x - from.x, ey = P[n].y - from.y;
-  const el = Math.hypot(ex, ey) || 1; ex /= el; ey /= el;
-  return { P, cum, total: cum[n], ex, ey, idx: 0 };
-}
+function buildPath(rawPts) {
+  const step = Math.max(3, Math.min(W, H) * 0.009);
+  const pts = resample(smooth(rawPts, 3), step);
+  // keep going in the final direction of the drawn line
+  const n = pts.length, from = pts[Math.max(0, n - 8)], last = pts[n - 1];
+  let dx = last.x - from.x, dy = last.y - from.y; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+  let len = polyLen(pts);
+  const maxLen = ref.L * 2.4;
+  let cur = last;
+  while (len < maxLen) { cur = { x: cur.x + dx * step, y: cur.y + dy * step }; pts.push(cur); len += step; }
 
-function posAt(pa, s) {
-  const n = pa.P.length - 1;
-  if (s >= pa.total) {
-    const d = s - pa.total;
-    return { x: pa.P[n].x + pa.ex * d, y: pa.P[n].y + pa.ey * d };   // keep going straight after the drawn line
+  const P = [], cum = [0], dir = new V3();
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) {
+    if (i > 0) s += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    const d = depthAt(s / ref.L);
+    rayDir(pts[i].x, pts[i].y, dir);
+    const k = (d - ref.camRel) / dir.dot(A);               // distance along the ray to the plane "d metres from the ball"
+    const p = camera.position.clone().addScaledVector(dir, Math.max(0.1, k));
+    p.y = Math.max(R, p.y);
+    P.push(p);
+    if (i > 0) cum.push(cum[i - 1] + p.distanceTo(P[i - 1]));
   }
-  while (pa.idx < n - 1 && pa.cum[pa.idx + 1] < s) pa.idx++;
+  P[0].copy(B);
+  return { P, cum, total: cum[cum.length - 1], idx: 0 };
+}
+function posAt(pa, sd, out) {
+  const n = pa.P.length - 1;
+  if (sd >= pa.total) {
+    const dd = pa.P[n].clone().sub(pa.P[n - 3]).normalize();
+    return out.copy(pa.P[n]).addScaledVector(dd, sd - pa.total);
+  }
+  if (sd < pa.cum[pa.idx]) pa.idx = 0;
+  while (pa.idx < n - 1 && pa.cum[pa.idx + 1] < sd) pa.idx++;
   const a = pa.P[pa.idx], b = pa.P[pa.idx + 1];
   const seg = pa.cum[pa.idx + 1] - pa.cum[pa.idx] || 1;
-  const t = (s - pa.cum[pa.idx]) / seg;
-  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
+  return out.lerpVectors(a, b, (sd - pa.cum[pa.idx]) / seg);
 }
 
 function release() {
   const len = polyLen(raw);
-  if (len < 60 || raw.length < 3) {
+  if (len < Math.min(W, H) * 0.12 || raw.length < 3) {
     state = 'aim'; raw = [];
-    flash('Drag further to draw your shot');
+    setHint('Drag further to draw your shot', true, 1800);
     return;
   }
   const elapsed = Math.max(0.12, (performance.now() - drawStart) / 1000);
-  const rawSpeed = len / elapsed;                                   // px per second of your finger
-  shotSpeed = lerp(520, 980, clamp((rawSpeed - 250) / 1250, 0, 1));// faster flick = harder shot
-
-  raw[0] = { x: ball.x, y: ball.y };
+  const pxPerSec = len / elapsed / Math.min(W, H) * 480;              // normalised so phones and desktops feel the same
+  shotSpeed = lerp(17, 31, clamp((pxPerSec - 250) / 1400, 0, 1));    // faster flick = harder shot (m/s)
+  raw[0] = project(ball.pos);
   path = buildPath(raw);
-  shotS = 0; shotT = 0; trail = [];
-  striker.t = 0;
+  travel = 0; shotClock = -KICK_DELAY; striker.t = 0;
   state = 'shot';
-  hintT = 0;
+  setHint('', false);
 }
 
 /* ======================================================================
-   PHYSICS / RULES
+   RULES & PHYSICS
    ====================================================================== */
-function stepShot(dt) {
-  const ox = ball.x, oy = ball.y;
-  shotT += dt;
-  const v = shotSpeed * (1 - 0.22 * clamp(shotS / 900, 0, 1));
-  shotS += v * dt;
-  const p = posAt(path, shotS);
-  ball.x = p.x; ball.y = p.y;
-  ball.vx = (p.x - ox) / dt; ball.vy = (p.y - oy) / dt;
-  ball.spin += dist(ox, oy, p.x, p.y) / BALL_R;
+function stepShot(h) {
+  shotClock += h;
+  if (shotClock < 0) return;
+  ball.prev.copy(ball.pos);
+  travel += shotSpeed * (1 - 0.15 * clamp(travel / 40, 0, 1)) * h;
+  posAt(path, travel, ball.pos);
+  ball.vel.copy(ball.pos).sub(ball.prev).divideScalar(h);
+  spinBall(ball.pos.distanceTo(ball.prev));
 
-  // 1. wall
+  // 1. the wall (the players jump just as the ball is struck)
   for (const w of wall) {
-    if (dist(ball.x, ball.y, w.x, w.y) < WALL_R + BALL_R) {
-      const d = dist(ball.x, ball.y, w.x, w.y) || 1;
-      const nx = (ball.x - w.x) / d, ny = (ball.y - w.y) / d;
-      ball.x = w.x + nx * (WALL_R + BALL_R + 1); ball.y = w.y + ny * (WALL_R + BALL_R + 1);
-      const dot = ball.vx * nx + ball.vy * ny;
-      ball.vx = (ball.vx - 2 * dot * nx) * 0.45;
-      ball.vy = (ball.vy - 2 * dot * ny) * 0.45;
-      finish('blocked');
-      return;
+    const dx = ball.pos.x - w.x, dz = ball.pos.z - w.z, d = Math.hypot(dx, dz);
+    if (d < WALL_R + R && ball.pos.y < WALL_H + w.jump + R) {
+      const nx = dx / (d || 1), nz = dz / (d || 1), dot = ball.vel.x * nx + ball.vel.z * nz;
+      ball.vel.x = (ball.vel.x - 2 * dot * nx) * 0.4; ball.vel.z = (ball.vel.z - 2 * dot * nz) * 0.4;
+      ball.vel.y = Math.abs(ball.vel.y) * 0.3 + 2.5;
+      ball.pos.x = w.x + nx * (WALL_R + R + 0.02); ball.pos.z = w.z + nz * (WALL_R + R + 0.02);
+      return finish('blocked');
     }
   }
-
-  // 2. goalkeeper (wider reach when he is stretching sideways)
-  const rx = 28 + 18 * Math.min(1, Math.abs(keeper.lean) * 2), ry = 20;
-  const q = Math.pow((ball.x - keeper.x) / rx, 2) + Math.pow((ball.y - keeper.y) / ry, 2);
-  if (q < 1) {
-    ball.vy = Math.abs(ball.vy) * 0.35 + 60;
-    ball.vx = ball.vx * 0.35 + rand(-140, 140);
-    finish('saved');
-    return;
+  // 2. the keeper: his reach grows when he is stretching sideways
+  if (Math.abs(ball.pos.z - KEEPER_Z) < 0.55 && ball.vel.z < 0) {
+    const ax = 0.5 + 0.7 * keeper.lean, ay = 0.95 + 0.3 * keeper.lean;
+    const cy = 1.0 + 0.2 * keeper.lean + keeper.jump * 0.5;
+    const q = Math.pow((ball.pos.x - keeper.x) / ax, 2) + Math.pow((ball.pos.y - cy) / ay, 2);
+    if (q < 1) {
+      const sp = Math.max(4, ball.vel.length() * 0.28);
+      ball.vel.set(rand(-1, 1) * sp, rand(1, 3.5), Math.abs(rand(0.5, 1)) * sp);
+      return finish('saved');
+    }
   }
-
   // 3. crossing the goal line
-  if (oy >= GOAL.y && ball.y < GOAL.y) {
-    const x = ball.x;
-    if (x > GOAL.l + POST_R && x < GOAL.r - POST_R) {
-      finish('goal');
-    } else if ((x >= GOAL.l - POST_R && x <= GOAL.l + POST_R) || (x >= GOAL.r - POST_R && x <= GOAL.r + POST_R)) {
-      ball.vy = Math.abs(ball.vy) * 0.35;
-      ball.vx = (x < (GOAL.l + GOAL.r) / 2 ? -1 : 1) * rand(60, 160);
-      finish('post');
-    } else {
-      finish('wide');
+  if (ball.prev.z > 0 && ball.pos.z <= 0) {
+    const f = ball.prev.z / (ball.prev.z - ball.pos.z);
+    const x = lerp(ball.prev.x, ball.pos.x, f), y = lerp(ball.prev.y, ball.pos.y, f);
+    const rr = POST + R;
+    if (Math.abs(x) < HALF + rr && y > GH - rr && y < GH + rr) {
+      ball.vel.set(rand(-1.5, 1.5), 1.5, Math.abs(ball.vel.z) * 0.35); return finish('bar');
     }
-    return;
+    if (y >= GH + rr) return finish('over');
+    if (Math.abs(x) < HALF - rr) {
+      ball.vel.multiplyScalar(0.45); ball.inNet = true; return finish('goal');
+    }
+    if (Math.abs(Math.abs(x) - HALF) <= rr) {
+      ball.vel.set(Math.sign(x) * rand(1, 3), 1, Math.abs(ball.vel.z) * 0.35); return finish('post');
+    }
+    return finish('wide');
   }
-
-  // 4. left the pitch
-  if (ball.x < -30 || ball.x > W + 30 || ball.y < -30 || ball.y > H + 30) finish('wide');
+  if (ball.pos.z < -6 || Math.abs(ball.pos.x) > 40 || ball.pos.y > 40 || ball.pos.z > 60) finish('wide');
 }
 
-function stepLoose(dt) {
-  ball.x += ball.vx * dt; ball.y += ball.vy * dt;
-  const f = Math.exp(-2.6 * dt);
-  ball.vx *= f; ball.vy *= f;
-  ball.spin += Math.hypot(ball.vx, ball.vy) * dt / BALL_R;
-  if (result === 'goal' && ball.y < GOAL.y) {              // the net stops the ball
-    if (ball.y < NET_BACK) { ball.y = NET_BACK; ball.vy = Math.abs(ball.vy) * 0.2; ball.vx *= 0.5; }
-    if (ball.x < GOAL.l + BALL_R) { ball.x = GOAL.l + BALL_R; ball.vx = Math.abs(ball.vx) * 0.3; }
-    if (ball.x > GOAL.r - BALL_R) { ball.x = GOAL.r - BALL_R; ball.vx = -Math.abs(ball.vx) * 0.3; }
+function stepLoose(h) {
+  ball.vel.y -= 9.8 * h;
+  ball.pos.addScaledVector(ball.vel, h);
+  if (ball.pos.y < R) {
+    ball.pos.y = R;
+    if (ball.vel.y < -1) ball.vel.y *= -0.5; else ball.vel.y = 0;
+    ball.vel.x *= 0.85; ball.vel.z *= 0.85;
   }
+  if (ball.pos.y <= R + 0.001) { const f = Math.exp(-1.6 * h); ball.vel.x *= f; ball.vel.z *= f; }
+  if (ball.inNet) {                                            // the net catches the ball
+    const bz = -(NET_BACK - 0.25 - R);
+    if (ball.pos.z < bz) { ball.pos.z = bz; ball.vel.z = Math.abs(ball.vel.z) * 0.12; ball.vel.x *= 0.5; }
+    const sx = HALF - R;
+    if (ball.pos.x > sx) { ball.pos.x = sx; ball.vel.x = -Math.abs(ball.vel.x) * 0.2; }
+    if (ball.pos.x < -sx) { ball.pos.x = -sx; ball.vel.x = Math.abs(ball.vel.x) * 0.2; }
+    const top = GH - R - 0.2 * clamp(-ball.pos.z / NET_TOP_BACK, 0, 1);
+    if (ball.pos.y > top) { ball.pos.y = top; ball.vel.y = -Math.abs(ball.vel.y) * 0.2; }
+  }
+  spinBall(ball.vel.length() * h);
 }
+
+const _ax = new V3(), _q = new THREE.Quaternion();
+function spinBall(dist) {
+  const v = ball.vel;
+  if (dist < 1e-5 || Math.hypot(v.x, v.z) < 0.05) return;
+  _ax.set(0, 1, 0).cross(new V3(v.x, 0, v.z).normalize()).normalize();
+  ballMesh.quaternion.premultiply(_q.setFromAxisAngle(_ax, dist / VR));
+}
+
+const BANNERS = {
+  goal:    ['GOAL!', 'What a free kick!', '#ffd23f'],
+  saved:   ['SAVED!', 'The keeper got there', '#ffffff'],
+  blocked: ['BLOCKED!', 'Curve it around the wall', '#ffffff'],
+  wide:    ['WIDE!', 'Just off target', '#ffffff'],
+  over:    ['OVER THE BAR!', 'A little too much power', '#ffffff'],
+  post:    ['OFF THE POST!', 'So close', '#ffffff'],
+  bar:     ['OFF THE BAR!', 'So close', '#ffffff']
+};
 
 function finish(r) {
-  result = r; resultT = 0;
-  state = 'loose';
+  result = r; resultT = 0; state = 'result';
   shotLog.push(r === 'goal' ? 'goal' : 'miss');
-  if (r === 'goal') {
-    goals++;
-    shake = 0.3;
-    for (let i = 0; i < 70; i++) {
-      confetti.push({
-        x: W / 2 + rand(-60, 60), y: 150, vx: rand(-260, 260), vy: rand(-420, -120),
-        c: pick(['#d6201f', '#ffffff', '#ffd23f', '#1b57b8']), rot: rand(0, 6), vr: rand(-8, 8), s: rand(5, 10)
-      });
-    }
-  }
+  if (r === 'goal') { goals++; shake = 0.45; goalCelebrate = 0; slowmo = 0.4; }
+  showBanner(r);
+  updateHUD();
 }
 
 function nextAttempt() {
   attempt++;
+  hideBanner();
   if (attempt >= SHOTS) {
-    state = 'over'; resultT = 0;
-    if (goals > best) {
-      best = goals;
-      try { localStorage.setItem('fkh_best', String(best)); } catch (e) { /* ignore */ }
+    state = 'over';
+    if (goals > best) { best = goals; try { localStorage.setItem('fkh3d_best', String(best)); } catch (e) { /* ignore */ } }
+    const ratio = goals / SHOTS;
+    $('oScore').textContent = goals + '/' + SHOTS;
+    $('oMsg').textContent = ratio === 1 ? 'Perfect round. Absolutely clinical!' : ratio >= 0.6 ? 'Great set-piece taking!' : goals > 0 ? 'Not bad. Keep practising!' : 'Not your day. Try again!';
+    $('oBest').textContent = 'Best round: ' + best + '/' + SHOTS;
+    $('over').classList.add('show');
+    setHint('', false);
+  } else newAttempt();
+}
+
+/* ======================================================================
+   KEEPER AI
+   ====================================================================== */
+function updateKeeper(h) {
+  const k = keeper;
+  const old = k.x;
+  if (state === 'shot' && shotClock >= 0 && !k.locked) {
+    if (shotClock > k.react && ball.vel.z < -1) {
+      // he reads the ball's *current* direction, so a late curve can fool him
+      const tt = ball.pos.z / -ball.vel.z;
+      const px = ball.pos.x + ball.vel.x * tt, py = ball.pos.y + ball.vel.y * tt;
+      if (Math.abs(px) > HALF + 0.4) {                      // heading wide of the post: he only shuffles across
+        k.targetX = clamp(px * 0.3, -1.3, 1.3); k.jump = 0;
+      } else {
+        k.targetX = clamp(px + k.err, -HALF + 0.2, HALF - 0.2);
+        k.jump = py > 1.6 ? 1 : 0;
+      }
+      k.committed = true;
+      if (shotClock > k.react + k.adapt) k.locked = true;
     }
-  } else {
-    newAttempt();
+  }
+  if (state === 'aim' || state === 'drawing') {
+    k.targetX = Math.sin(time * 1.4) * 0.35;
+    k.x += clamp(k.targetX - k.x, -1.2 * h, 1.2 * h);
+  } else if (k.committed) {
+    const dist = k.targetX - k.x, sp = Math.min(Math.abs(dist) * 9, k.speed * 1.2);
+    k.x += Math.sign(dist) * Math.min(Math.abs(dist), sp * h);
+  } else if (state === 'result') {
+    k.x += clamp(0 - k.x, -1.5 * h, 1.5 * h);
+  }
+  k.vx = (k.x - old) / h;
+  const diving = k.committed && Math.abs(k.targetX - k.x) > 0.05 || Math.abs(k.vx) > 2;
+  const want = k.committed ? clamp(Math.abs(k.vx) / 4.5, 0, 1) * (Math.abs(k.targetX) > 0.9 ? 1 : 0.45) : 0;
+  k.lean = lerp(k.lean, want, Math.min(1, 12 * h));
+  if (k.vx !== 0) k.dir = lerp(k.dir, Math.sign(k.vx), Math.min(1, 14 * h));
+  if (!k.committed) k.dir = lerp(k.dir, 0, Math.min(1, 6 * h));
+  // pose
+  const u = k.obj.userData, o = k.obj;
+  o.position.x = k.x;
+  const lean = k.lean;
+  u.body.rotation.z = (state === 'shot' || state === 'result') ? -k.dir * lean * 1.25 * Math.sign(1) : 0;
+  u.body.position.y = H0 + 0.28 * lean + (k.jump ? 0.18 : 0);
+  const up = clamp(lean * 1.2 + (k.jump ? 0.5 : 0), 0, 1);
+  const ready = (state === 'aim' || state === 'drawing') ? 0.38 + Math.sin(time * 3) * 0.04 : 0.45;
+  u.arms[0].rotation.set(0.25, 0, -lerp(ready, 2.7, up)); u.arms[1].rotation.set(0.25, 0, lerp(ready, 2.7, up));
+  u.legs[0].rotation.set(0, 0, lerp(-0.18, -0.6, lean)); u.legs[1].rotation.set(0, 0, lerp(0.18, 0.6, lean));
+  void diving;
+}
+
+/* ======================================================================
+   ANIMATION OF THE OTHER PLAYERS
+   ====================================================================== */
+function updateStriker(h) {
+  const s = striker, u = s.obj.userData;
+  const t = s.t;
+  if (state === 'aim' || state === 'drawing') {
+    u.legs[0].rotation.x = Math.sin(time * 2) * 0.03; u.legs[1].rotation.x = 0;
+    u.arms[0].rotation.set(0, 0, -0.12); u.arms[1].rotation.set(0, 0, 0.12);
+    u.body.position.y = H0 + Math.sin(time * 2.4) * 0.008;
+    return;
+  }
+  if (t >= 0 && state !== 'over') {
+    s.t += h;
+    const run = clamp(s.t / KICK_DELAY, 0, 1), e = easeOut(run);
+    const away = easeOut(clamp((s.t - KICK_DELAY - 0.2) / 2.2, 0, 1));                      // after the kick he jogs off to the side
+    s.obj.position.x = lerp(s.start.x, s.end.x, e) + (-RIGHT.x * 1.2 + A.x * 3.5) * away;
+    s.obj.position.z = lerp(s.start.z, s.end.z, e) + (-RIGHT.z * 1.2 + A.z * 3.5) * away;
+    const swing = s.t < KICK_DELAY ? -0.9 * run : lerp(-0.9, 1.35, easeOut(clamp((s.t - KICK_DELAY) / 0.12, 0, 1)));
+    const follow = clamp((s.t - KICK_DELAY - 0.25) / 0.6, 0, 1);
+    u.legs[1].rotation.x = lerp(swing, 0.2, follow);
+    u.legs[0].rotation.x = lerp(-0.12, 0.05, run);
+    u.arms[0].rotation.set(lerp(0, 0.7, clamp(run, 0, 1)), 0, -0.4); u.arms[1].rotation.set(lerp(0, -0.6, run), 0, 0.5);
+    u.body.rotation.x = lerp(0, -0.12, run) * (1 - follow);
+    u.body.position.y = H0;
+  }
+  if (state === 'result' && result === 'goal') {
+    goalCelebrate += h;
+    const j = Math.abs(Math.sin(goalCelebrate * 6)) * 0.22;
+    u.body.position.y = H0 + j;
+    u.arms[0].rotation.set(0, 0, -2.7); u.arms[1].rotation.set(0, 0, 2.7);
+    u.legs[1].rotation.x = 0;
+  } else if (state === 'result' && s.t > 0.6) {
+    u.arms[0].rotation.set(-2.5, 0, -0.3); u.arms[1].rotation.set(-2.5, 0, 0.3);   // hands on head
   }
 }
 
-function updateKeeper(dt) {
-  const gx = (GOAL.l + GOAL.r) / 2;
-  let tx = null, spd = keeper.speed;
-  if (state === 'aim' || state === 'drawing') {
-    tx = gx + Math.sin(time * 1.6) * 12; spd = 40;                    // nervous swaying
-  } else if (result === null && shotT > keeper.react && ball.vy < -1) {
-    const tt = Math.max(0, (ball.y - keeper.y) / -ball.vy);           // time until ball reaches him
-    tx = clamp(ball.x + ball.vx * tt + keeper.err, GOAL.l + 8, GOAL.r - 8); // he reads the ball's current direction
-  } else if (result !== null && result !== 'goal' && result !== 'saved') {
-    tx = gx; spd = 60;
+function updateWall(h) {
+  for (const w of wall) {
+    if (state === 'shot' && shotClock > -0.02) {
+      const tj = shotClock + 0.02;
+      w.jump = tj < 0.6 ? 0.34 * Math.sin(Math.PI * tj / 0.6) : 0;
+    } else if (state !== 'result') w.jump = 0;
+    else if (w.jump > 0) w.jump = Math.max(0, w.jump - 2 * h);
+    w.obj.position.y = w.jump;
+    const u = w.obj.userData;
+    u.legs[0].rotation.x = u.legs[1].rotation.x = w.jump > 0.02 ? -0.5 : 0;
   }
-  const old = keeper.x;
-  if (tx !== null) keeper.x += clamp(tx - keeper.x, -spd * dt, spd * dt);
-  const v = (keeper.x - old) / dt;
-  keeper.lean = lerp(keeper.lean, clamp(v / 180, -1, 1) * 0.7, Math.min(1, 10 * dt));
+}
+
+/* ======================================================================
+   UI HELPERS
+   ====================================================================== */
+const hint = $('hint');
+function setHint(text, show, ms) {
+  clearTimeout(setHint.t);
+  hint.textContent = text; hint.classList.toggle('hide', !show || !text);
+  if (show && ms) setHint.t = setTimeout(() => { if (state === 'aim') setHint(attempt === 0 ? 'Drag from the ball and curve your shot around the wall' : 'Drag from the ball to take your free kick', true); }, ms);
+}
+function showBanner(r) {
+  const [title, sub, col] = BANNERS[r], b = $('banner');
+  $('bTitle').textContent = title; $('bTitle').style.color = col; $('bSub').textContent = sub; $('bTap').style.opacity = 0;
+  b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+  setTimeout(() => { $('bTap').style.opacity = 0.75; }, 700);
+}
+function hideBanner() { $('banner').classList.remove('show'); }
+function updateHUD() {
+  $('tHome').textContent = CFG.homeTeam; $('tAway').textContent = CFG.awayTeam;
+  $('goals').textContent = goals;
+  $('shotn').textContent = Math.min(attempt + 1, SHOTS); $('shotsTotal').textContent = SHOTS;
+  const pips = $('pips');
+  if (pips.children.length !== SHOTS) { pips.innerHTML = ''; for (let i = 0; i < SHOTS; i++) { const d = document.createElement('div'); d.className = 'pip'; pips.appendChild(d); } }
+  [...pips.children].forEach((d, i) => { d.className = 'pip' + (shotLog[i] === 'goal' ? ' goal' : shotLog[i] === 'miss' ? ' miss' : ''); });
+}
+
+/* 2D overlay: ring around the ball, and the line being drawn */
+function drawOverlay() {
+  fctx.clearRect(0, 0, W, H);
+  if (state === 'aim') {
+    const b = project(ball.pos);
+    const edge = project(new V3().copy(ball.pos).addScaledVector(RIGHT, VR * 1.4));
+    const r = Math.max(18, Math.hypot(edge.x - b.x, edge.y - b.y) * 2.2) + Math.sin(time * 5) * 2.5;
+    fctx.save(); fctx.strokeStyle = 'rgba(255,255,255,.9)'; fctx.lineWidth = 2.5; fctx.setLineDash([7, 6]); fctx.lineDashOffset = -time * 24;
+    fctx.beginPath(); fctx.arc(b.x, b.y, r, 0, Math.PI * 2); fctx.stroke(); fctx.restore();
+  }
+  if (state === 'drawing' && raw.length > 1) {
+    fctx.save(); fctx.lineCap = 'round'; fctx.lineJoin = 'round';
+    const line = () => { fctx.beginPath(); fctx.moveTo(raw[0].x, raw[0].y); for (const p of raw) fctx.lineTo(p.x, p.y); };
+    fctx.strokeStyle = 'rgba(0,0,0,.4)'; fctx.lineWidth = 9; line(); fctx.stroke();
+    fctx.strokeStyle = '#fff'; fctx.lineWidth = 4; fctx.setLineDash([11, 9]); fctx.lineDashOffset = -time * 40; line(); fctx.stroke();
+    const e = raw[raw.length - 1], b = raw[Math.max(0, raw.length - 6)], an = Math.atan2(e.y - b.y, e.x - b.x);
+    fctx.setLineDash([]); fctx.fillStyle = '#fff'; fctx.translate(e.x, e.y); fctx.rotate(an);
+    fctx.beginPath(); fctx.moveTo(15, 0); fctx.lineTo(-6, -10); fctx.lineTo(-6, 10); fctx.closePath(); fctx.fill();
+    fctx.restore();
+  }
+}
+
+/* ======================================================================
+   FRAME UPDATE
+   ====================================================================== */
+const camLook = new V3(0, LOOK_Y, 0), camPos = new V3();
+function updateCamera(dt) {
+  let push = 0, tx = 0, ty = LOOK_Y, tz = 0;
+  if (state === 'result') {
+    const e = easeOut(clamp(resultT / 1.6, 0, 1));
+    push = (result === 'goal' ? 7 : 1.5) * e;
+    if (result === 'goal') ty = LOOK_Y + 1.6 * e;
+  }
+  camPos.copy(camBase).addScaledVector(A, push);
+  if (shake > 0) { camPos.x += rand(-1, 1) * shake * 0.08; camPos.y += rand(-1, 1) * shake * 0.08; }
+  camera.position.copy(camPos);
+  camLook.set(tx, ty, tz);
+  camera.lookAt(camLook);
 }
 
 function update(dt) {
   time += dt;
-  if (hintT > 0) hintT -= dt;
-  if (shake > 0) shake -= dt;
-
-  const n = Math.max(1, Math.ceil(dt / (1 / 120)));
-  const h = dt / n;
-  for (let i = 0; i < n; i++) {
+  if (shake > 0) shake = Math.max(0, shake - dt);
+  const sub = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / sub;
+  for (let i = 0; i < sub; i++) {
     if (state === 'shot') stepShot(h);
-    else if (state === 'loose') stepLoose(h);
+    else if (state === 'result') stepLoose(h);
   }
-  if (state === 'shot' || state === 'loose') {
-    trail.push({ x: ball.x, y: ball.y });
-    if (trail.length > 16) trail.shift();
-  } else if (trail.length) trail.shift();
+  updateKeeper(dt); updateStriker(dt); updateWall(dt);
+  if (state === 'result') { resultT += dt / Math.max(slowmo, 0.01) * slowmo; if (slowmo < 1 && resultT > 0.9) slowmo = Math.min(1, slowmo + dt * 1.5); }
+  if (state === 'result' && resultT > 2.7) nextAttempt();
 
-  updateKeeper(dt);
-
-  if (striker.t >= 0) {
-    striker.t = Math.min(1.5, striker.t + dt / 0.3);
-    const e = easeOut(Math.min(1, striker.t * 1.4));
-    striker.x = lerp(striker.sx, striker.ex, e);
-    striker.y = lerp(striker.sy, striker.ey, e);
-  }
-
-  if (state === 'loose' || state === 'over') resultT += dt;
-  if (state === 'loose' && resultT > 2.4) nextAttempt();
-
-  for (const c of confetti) {
-    c.vy += 700 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt; c.vx *= 0.99;
-  }
-  confetti = confetti.filter(c => c.y < H + 20);
-}
-
-/* ======================================================================
-   DRAWING: PITCH (pre-rendered once)
-   ====================================================================== */
-function rr(g, x, y, w, h, r) {
-  g.beginPath();
-  g.moveTo(x + r, y);
-  g.arcTo(x + w, y, x + w, y + h, r);
-  g.arcTo(x + w, y + h, x, y + h, r);
-  g.arcTo(x, y + h, x, y, r);
-  g.arcTo(x, y, x + w, y, r);
-  g.closePath();
-}
-
-const pitch = (() => {
-  const c = document.createElement('canvas');
-  c.width = W * S; c.height = H * S;
-  const g = c.getContext('2d');
-  g.scale(S, S);
-
-  // stands
-  g.fillStyle = '#10161d'; g.fillRect(0, 0, W, 56);
-  const crowd = ['#d6201f', '#ffffff', '#1b57b8', '#e8c547', '#8a8f98', '#2a313b'];
-  for (let i = 0; i < 520; i++) {
-    g.fillStyle = crowd[Math.floor(Math.random() * crowd.length)];
-    g.globalAlpha = 0.55 + Math.random() * 0.35;
-    g.beginPath(); g.arc(Math.random() * W, 4 + Math.random() * 40, 2.4, 0, Math.PI * 2); g.fill();
-  }
-  g.globalAlpha = 1;
-  // advertising boards
-  const boards = ['#d6201f', '#f2f2f2', '#1b57b8'];
-  for (let x = 0, i = 0; x < W; x += 60, i++) {
-    g.fillStyle = boards[i % 3]; g.fillRect(x, 44, 60, 12);
-    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x, 54, 60, 2);
-  }
-
-  // grass
-  for (let y = 56, i = 0; y < H; y += 46, i++) {
-    g.fillStyle = i % 2 ? '#2b8238' : '#2f8f3f';
-    g.fillRect(0, y, W, 46);
-  }
-  g.fillStyle = 'rgba(0,0,0,.10)';
-  g.fillRect(0, 56, 20, H); g.fillRect(460, 56, 20, H);   // outside touchlines
-  g.fillRect(20, 56, 440, GOAL.y - 56);                   // behind the goal line
-
-  // lines
-  g.strokeStyle = 'rgba(255,255,255,.88)'; g.lineWidth = 3; g.lineJoin = 'round';
-  g.beginPath(); g.moveTo(20, GOAL.y); g.lineTo(460, GOAL.y); g.stroke();      // goal line
-  g.beginPath(); g.moveTo(20, GOAL.y); g.lineTo(20, H); g.stroke();            // touchlines
-  g.beginPath(); g.moveTo(460, GOAL.y); g.lineTo(460, H); g.stroke();
-  g.strokeRect(60, GOAL.y, 360, 230);                                          // penalty area
-  g.strokeRect(110, GOAL.y, 260, 80);                                          // six-yard box
-  g.fillStyle = 'rgba(255,255,255,.9)';
-  g.beginPath(); g.arc(240, 262, 3.5, 0, Math.PI * 2); g.fill();               // penalty spot
-  const a = Math.asin((340 - 262) / 100);
-  g.beginPath(); g.arc(240, 262, 100, a, Math.PI - a); g.stroke();             // penalty arc
-  return c;
-})();
-
-/* ======================================================================
-   DRAWING: PEOPLE
-   ====================================================================== */
-function drawPerson(x, y, o) {
-  const s = depth(y) * (o.scale || 1);
-  const k = o.kit;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s, s);
-
-  // shadow
-  ctx.fillStyle = 'rgba(0,0,0,.28)';
-  ctx.beginPath(); ctx.ellipse(0, 1, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
-
-  if (o.lean) { ctx.translate(0, -24); ctx.rotate(o.lean); ctx.translate(0, 24); }
-
-  // legs
-  const leg = (hx, ang) => {
-    ctx.save(); ctx.translate(hx, -18); ctx.rotate(ang);
-    ctx.fillStyle = o.skin; rr(ctx, -3, 0, 6, 9, 2); ctx.fill();
-    ctx.fillStyle = k.socks; rr(ctx, -3, 8, 6, 7, 2); ctx.fill();
-    ctx.fillStyle = k.shoes; rr(ctx, -4, 14, 8, 5, 2); ctx.fill();
-    ctx.restore();
-  };
-  leg(-5, 0);
-  leg(5, o.kick ? -o.kick : 0);
-
-  // shorts
-  ctx.fillStyle = k.shorts; rr(ctx, -10, -29, 20, 12, 3); ctx.fill();
-
-  // arms (behind torso edge)
-  const arm = (sx, sign) => {
-    ctx.save(); ctx.translate(sx, -45); ctx.rotate(sign * (0.12 + (o.arms || 0) * 2.2));
-    ctx.fillStyle = o.skin; rr(ctx, -3, 0, 6, 17, 3); ctx.fill();
-    ctx.fillStyle = k.stripe ? k.shirt : k.shirt; rr(ctx, -3.5, 0, 7, 7, 3); ctx.fill();
-    if (k.gloves) { ctx.fillStyle = k.gloves; ctx.beginPath(); ctx.arc(0, 18, 4.5, 0, Math.PI * 2); ctx.fill(); }
-    ctx.restore();
-  };
-  arm(-12, 1); arm(12, -1);
-
-  // torso
-  ctx.save();
-  rr(ctx, -11, -49, 22, 23, 5); ctx.clip();
-  ctx.fillStyle = k.shirt; ctx.fillRect(-12, -50, 24, 25);
-  if (k.stripe) {
-    ctx.fillStyle = k.stripe;
-    for (let sx = -11 + 5.5; sx < 11; sx += 11) ctx.fillRect(sx, -50, 5.5, 25);
-  }
-  ctx.fillStyle = 'rgba(0,0,0,.10)'; ctx.fillRect(-12, -33, 24, 8);          // soft shading near the hem
-  ctx.restore();
-  if (!o.back) { ctx.fillStyle = k.trim; ctx.beginPath(); ctx.arc(0, -49, 4, 0, Math.PI); ctx.fill(); } // collar
-
-  // head
-  ctx.fillStyle = o.skin; ctx.beginPath(); ctx.arc(0, -56, 8, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = o.hair;
-  if (o.back) {
-    ctx.beginPath(); ctx.arc(0, -56.5, 8.6, 0, Math.PI * 2); ctx.fill();
-  } else {
-    ctx.beginPath(); ctx.arc(0, -57, 8.6, Math.PI, 0); ctx.fill();
-    ctx.fillStyle = '#222';
-    ctx.beginPath(); ctx.arc(-3, -55.5, 1.1, 0, Math.PI * 2); ctx.arc(3, -55.5, 1.1, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawLabel(x, y, text) {
-  ctx.save();
-  ctx.font = '700 11px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  const w = ctx.measureText(text).width + 12;
-  ctx.fillStyle = 'rgba(214,32,31,.92)';
-  rr(ctx, x - w / 2, y, w, 16, 8); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, x, y + 8.5);
-  ctx.restore();
-}
-
-function drawBall() {
-  const r = BALL_R * depth(ball.y) * 1.05;
-  ctx.save();
-  ctx.translate(ball.x, ball.y);
-  ctx.fillStyle = 'rgba(0,0,0,.30)';
-  ctx.beginPath(); ctx.ellipse(0, 0, r * 0.95, r * 0.38, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.translate(0, -r * 0.8);
-  ctx.rotate(ball.spin * 0.5);
-  ctx.fillStyle = '#fafafa'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#20242b';
-  ctx.beginPath();
-  for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 - Math.PI / 2; ctx.lineTo(Math.cos(a) * r * 0.36, Math.sin(a) * r * 0.36); }
-  ctx.closePath(); ctx.fill();
-  for (let i = 0; i < 5; i++) {
-    const a = i * Math.PI * 2 / 5 - Math.PI / 2 + 0.3;
-    ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.78, Math.sin(a) * r * 0.78, r * 0.17, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-  ctx.restore();
-}
-
-function drawTrail() {
-  if (trail.length < 2) return;
-  ctx.save(); ctx.lineCap = 'round';
-  for (let i = 1; i < trail.length; i++) {
-    const t = i / trail.length;
-    ctx.strokeStyle = `rgba(255,255,255,${0.35 * t})`;
-    ctx.lineWidth = 2 + 8 * t;
-    ctx.beginPath(); ctx.moveTo(trail[i - 1].x, trail[i - 1].y - 6); ctx.lineTo(trail[i].x, trail[i].y - 6); ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawNetBack() {
-  ctx.fillStyle = 'rgba(8,28,14,.5)';
-  ctx.fillRect(GOAL.l, NET_TOP, GOAL.r - GOAL.l, GOAL.y - NET_TOP);
-}
-function drawNetFront() {
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let x = GOAL.l + 10; x < GOAL.r; x += 10) { ctx.moveTo(x, NET_TOP); ctx.lineTo(x, GOAL.y); }
-  for (let y = NET_TOP + 10; y < GOAL.y; y += 10) { ctx.moveTo(GOAL.l, y); ctx.lineTo(GOAL.r, y); }
-  ctx.stroke();
-  ctx.strokeStyle = '#fdfdfd'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(GOAL.l, GOAL.y); ctx.lineTo(GOAL.l, NET_TOP); ctx.lineTo(GOAL.r, NET_TOP); ctx.lineTo(GOAL.r, GOAL.y); ctx.stroke();
-  ctx.restore();
-}
-
-/* ======================================================================
-   DRAWING: HUD & OVERLAYS
-   ====================================================================== */
-const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-
-function drawHUD() {
-  ctx.fillStyle = 'rgba(0,0,0,.38)'; ctx.fillRect(0, 0, W, 42);
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = `700 12px ${FONT}`;
-  ctx.fillText(`${CFG.homeTeam}  vs  ${CFG.awayTeam}`, W / 2, 12);
-  ctx.textAlign = 'left'; ctx.font = `800 15px ${FONT}`;
-  ctx.fillText(`Goals ${goals}`, 14, 30);
-  ctx.textAlign = 'right';
-  ctx.fillText(`Shot ${Math.min(attempt + 1, SHOTS)}/${SHOTS}`, W - 14, 30);
-  for (let i = 0; i < SHOTS; i++) {
-    const x = W / 2 + (i - (SHOTS - 1) / 2) * 15;
-    ctx.beginPath(); ctx.arc(x, 30, 5, 0, Math.PI * 2);
-    ctx.fillStyle = shotLog[i] === 'goal' ? '#3ddc84' : shotLog[i] === 'miss' ? '#e5484d' : 'rgba(255,255,255,.28)';
-    ctx.fill();
-  }
-}
-
-function drawHint() {
-  let lines = null;
-  if (hintT > 0) lines = [hintMsg];
-  else if (state === 'aim') {
-    lines = attempt === 0
-      ? ['Drag from the ball and curve it around the wall', 'A faster flick means a harder shot']
-      : ['Drag from the ball to take your free kick'];
-  }
-  if (!lines) return;
-  ctx.save();
-  ctx.font = `600 13px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 28;
-  const h = 14 + lines.length * 18;
-  const y = H - 14 - h;
-  ctx.fillStyle = 'rgba(0,0,0,.55)'; rr(ctx, W / 2 - w / 2, y, w, h, 12); ctx.fill();
-  ctx.fillStyle = '#fff';
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, y + 7 + 9 + i * 18 + 1));
-  ctx.restore();
-}
-
-function drawAim() {
-  if (state === 'aim') {                                   // pulsing ring around the ball
-    const r = 26 + 3 * Math.sin(time * 5);
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2.5; ctx.setLineDash([6, 6]);
-    ctx.lineDashOffset = -time * 20;
-    ctx.beginPath(); ctx.arc(ball.x, ball.y - 6, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  }
-  if (state === 'drawing' && raw.length > 1) {
-    ctx.save();
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    const line = () => { ctx.beginPath(); ctx.moveTo(raw[0].x, raw[0].y - 6); for (const p of raw) ctx.lineTo(p.x, p.y - 6); };
-    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 9; line(); ctx.stroke();
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.setLineDash([10, 9]); ctx.lineDashOffset = -time * 40; line(); ctx.stroke();
-    const e = raw[raw.length - 1], b = raw[Math.max(0, raw.length - 6)];
-    const a = Math.atan2(e.y - b.y, e.x - b.x);
-    ctx.setLineDash([]); ctx.fillStyle = '#fff';
-    ctx.translate(e.x, e.y - 6); ctx.rotate(a);
-    ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-6, -9); ctx.lineTo(-6, 9); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-}
-
-const BANNERS = {
-  goal:    ['GOAL!', 'What a strike!', '#ffd23f'],
-  saved:   ['SAVED!', 'The keeper got a hand to it', '#ffffff'],
-  blocked: ['BLOCKED!', 'Curve it around the wall', '#ffffff'],
-  wide:    ['WIDE!', 'Just off target', '#ffffff'],
-  post:    ['OFF THE POST!', 'So close...', '#ffffff']
-};
-
-function drawBanner() {
-  if (state !== 'loose' || !result) return;
-  const [title, sub, col] = BANNERS[result];
-  const t = clamp(resultT / 0.3, 0, 1);
-  const sc = 0.5 + 0.5 * easeOutBack(t);
-  ctx.save();
-  ctx.translate(W / 2, 330); ctx.scale(sc, sc);
-  ctx.globalAlpha = clamp(resultT / 0.12, 0, 1);
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `italic 900 ${title.length > 8 ? 46 : 64}px ${FONT}`;
-  ctx.lineJoin = 'round'; ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(0,0,0,.65)';
-  ctx.strokeText(title, 0, 0);
-  ctx.fillStyle = col; ctx.fillText(title, 0, 0);
-  ctx.font = `600 16px ${FONT}`; ctx.lineWidth = 5;
-  ctx.strokeText(sub, 0, 40); ctx.fillStyle = '#fff'; ctx.fillText(sub, 0, 40);
-  if (resultT > 0.7) {
-    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(time * 5);
-    ctx.font = `600 12px ${FONT}`; ctx.lineWidth = 4;
-    ctx.strokeText('tap to continue', 0, 68); ctx.fillText('tap to continue', 0, 68);
-  }
-  ctx.restore();
-}
-
-function drawOver() {
-  ctx.fillStyle = 'rgba(5,12,8,.78)'; ctx.fillRect(0, 0, W, H);
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
-  ctx.font = `italic 900 46px ${FONT}`; ctx.fillText('FULL TIME', W / 2, 210);
-  ctx.font = `800 72px ${FONT}`; ctx.fillStyle = '#ffd23f';
-  ctx.fillText(`${goals} / ${SHOTS}`, W / 2, 300);
-  ctx.fillStyle = '#fff'; ctx.font = `600 17px ${FONT}`;
-  const ratio = goals / SHOTS;
-  const msg = ratio === 1 ? 'Perfect round. Absolutely clinical!'
-            : ratio >= 0.6 ? 'Great set-piece taking!'
-            : goals > 0 ? 'Not bad. Keep practising!'
-            : 'Not your day. Try again!';
-  ctx.fillText(msg, W / 2, 365);
-  ctx.fillStyle = 'rgba(255,255,255,.65)'; ctx.font = `600 14px ${FONT}`;
-  ctx.fillText(`Best round: ${best} / ${SHOTS}`, W / 2, 400);
-  ctx.fillStyle = '#d6201f'; rr(ctx, BTN.x, BTN.y, BTN.w, BTN.h, 29); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = `800 19px ${FONT}`;
-  ctx.fillText('Play again', W / 2, BTN.y + BTN.h / 2 + 1);
-}
-
-/* ======================================================================
-   RENDER
-   ====================================================================== */
-function render() {
-  ctx.setTransform(S, 0, 0, S, 0, 0);
-  ctx.clearRect(0, 0, W, H);
-  ctx.save();
-  if (shake > 0) ctx.translate(rand(-4, 4) * shake / 0.3, rand(-4, 4) * shake / 0.3);
-
-  ctx.drawImage(pitch, 0, 0, W, H);
-
-  // ball spot marker
-  if (state === 'aim' || state === 'drawing') {
-    ctx.fillStyle = 'rgba(255,255,255,.55)';
-    ctx.beginPath(); ctx.ellipse(ball.x, ball.y, 13, 5, 0, 0, Math.PI * 2); ctx.fill();
-  }
-
-  drawNetBack();
-  const ballInGoal = ball.y < GOAL.y;
-  if (ballInGoal) drawBall();
-  drawNetFront();
-  drawTrail();
-
-  const items = [];
-  for (const w of wall) items.push({ y: w.y, f: () => drawPerson(w.x, w.y, { kit: KIT_AWAY, skin: w.skin, hair: w.hair, arms: 0.05 }) });
-  items.push({
-    y: keeper.y,
-    f: () => {
-      const moving = Math.abs(keeper.lean) > 0.12;
-      const arms = result === 'saved' ? 1 : (state === 'shot' && moving) ? 0.55 + Math.min(0.3, Math.abs(keeper.lean)) : 0.18;
-      drawPerson(keeper.x, keeper.y, { kit: KIT_GK, skin: '#e0ac85', hair: '#2b1d12', arms, lean: keeper.lean });
-    }
+  ballMesh.position.copy(ball.pos);
+  if (state === 'shot' || state === 'result') {
+    trailHist.unshift(ball.pos.clone()); if (trailHist.length > trailSprites.length) trailHist.pop();
+  } else trailHist.length = 0;
+  trailSprites.forEach((s, i) => {
+    const p = trailHist[i * 1];
+    if (!p || state === 'aim' || state === 'drawing') { s.visible = false; return; }
+    const f = 1 - i / trailSprites.length;
+    s.visible = true; s.position.copy(p); s.material.opacity = 0.28 * f; s.scale.setScalar(0.12 + 0.34 * f);
   });
-  const kickAng = striker.t < 0 ? 0 : Math.sin(Math.min(1, striker.t * 1.6) * Math.PI) * 1.2;
-  items.push({
-    y: striker.y,
-    f: () => {
-      drawPerson(striker.x, striker.y, { kit: KIT_HOME, skin: '#f1c9a5', hair: '#b88a4a', back: true, arms: 0.1, kick: kickAng, scale: 1.0 });
-      drawLabel(striker.x, striker.y + 8, CFG.playerName);
-    }
-  });
-  if (!ballInGoal) items.push({ y: ball.y + 1, f: drawBall });
-  items.sort((a, b) => a.y - b.y).forEach(it => it.f());
-
-  drawAim();
-
-  for (const c of confetti) {
-    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot);
-    ctx.fillStyle = c.c; ctx.fillRect(-c.s / 2, -c.s / 4, c.s, c.s / 2);
-    ctx.restore();
-  }
-  ctx.restore();
-
-  drawHUD();
-  drawHint();
-  drawBanner();
-  if (state === 'over') drawOver();
+  updateCamera(dt);
+  // keep the shadow frustum around the action
+  lights.sun.position.set(B.x - 14, 34, B.z + 14); lights.sun.target.position.set(B.x * 0.5, 0, B.z * 0.55 - 2); lights.sun.target.updateMatrixWorld();
 }
 
-/* ======================================================================
-   MAIN LOOP
-   ====================================================================== */
 let last = null;
 function frame(now) {
+  if (window.__FK_MANUAL) { requestAnimationFrame(frame); return; }            // automated tests step the game themselves
   if (last === null) last = now;
-  const dt = clamp((now - last) / 1000, 0.001, 0.05);
-  last = now;
-  update(dt);
-  render();
+  const dt = clamp((now - last) / 1000, 0.001, 0.05); last = now;
+  update(dt * (state === 'result' ? slowmo : 1) || dt);
+  renderer.render(scene, camera);
+  drawOverlay();
   requestAnimationFrame(frame);
 }
 
+window.addEventListener('resize', resize);
+ensureWorld();
+resize();
 newAttempt();
 requestAnimationFrame(frame);
 
-if (window.__FK_TEST) window.__FK_TEST({ get state() { return state; }, get ball() { return ball; }, get result() { return result; }, get goals() { return goals; }, get attempt() { return attempt; } });
+// small hook so the game can be driven by automated tests
+window.__FK = {
+  get state() { return state; }, get result() { return result; }, get goals() { return goals; }, get attempt() { return attempt; },
+  ball, wall: () => wall, keeper: () => keeper, project: p => project(new V3(p.x, p.y, p.z)), ref: () => ref, B, A,
+  get W() { return W; }, get H() { return H; }, camera,
+  sim: (dt, n = 1) => { for (let i = 0; i < n; i++) update(dt); },
+  fire: (pts, ms) => { state = 'drawing'; raw = pts; drawStart = performance.now() - ms; release(); },
+  render: () => { renderer.render(scene, camera); drawOverlay(); },
+  next: () => nextAttempt(), path: () => path && path.P.map(p => [p.x, p.y, p.z])
+};
 })();
 </script>
 </body>
