@@ -22,7 +22,7 @@
   #stage { position: fixed; inset: 0; overflow: hidden; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   #fx {
-    touch-action: none;            /* drag with a finger without scrolling the page */
+    touch-action: none;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     cursor: grab;
   }
@@ -102,11 +102,7 @@
   <div id="fallback">This game needs WebGL. Try a recent version of Chrome, Safari, Edge or Firefox.</div>
 </div>
 
-<!-- app.py inlines three.min.js here. Opening this file directly loads it from the same folder. -->
 <script src="three.min.js"></script>
-
-<!-- app.py replaces this placeholder with the settings picked in the Streamlit sidebar.
-     When you open this file directly in a browser the defaults below are used. -->
 <script>/*__GAME_CONFIG__*/</script>
 
 <script>
@@ -114,12 +110,12 @@
 'use strict';
 
 /* ======================================================================
-   SETTINGS - everything you might want to tweak lives up here
+   SETTINGS
    ====================================================================== */
 const CFG = Object.assign({
-  shots: 5,                 // free kicks per round
-  keeperSkill: 3,           // 1 (easy) .. 5 (hard)
-  playerName: 'Ørjasæter',  // printed on the back of the shirt
+  shots: 5,
+  keeperSkill: 3,
+  playerName: 'Ørjasæter',
   homeTeam: 'FC TWENTE',
   awayTeam: 'SC HEERENVEEN'
 }, window.GAME_CONFIG || {});
@@ -132,17 +128,15 @@ const easeOut = t => 1 - Math.pow(1 - t, 3);
 const SHOTS = clamp(Math.round(CFG.shots), 1, 20);
 const SKILL = clamp(CFG.keeperSkill, 1, 5);
 
-// World units are metres. The goal line is z = 0, the goal is centred on x = 0,
-// the pitch runs towards +z, and the camera looks along -z.
-const R = 0.11;                         // ball radius used for collisions
-const VR = 0.17;                        // ball radius drawn (a bit bigger so it reads from far away)
-const GW = 7.32, GH = 2.44, HALF = GW / 2, POST = 0.06;   // real goal size
+const R = 0.11;
+const VR = 0.17;
+const GW = 7.32, GH = 2.44, HALF = GW / 2, POST = 0.06;
 const NET_BACK = 2.1, NET_TOP_BACK = 1.4;
-const WALL_DIST = 9.15, WALL_SP = 0.55, WALL_R = 0.3, WALL_H = 1.86;
+const WALL_DIST = 9.15, WALL_SP = 0.55, WALL_R = 0.28, WALL_H = 1.84;
 const KEEPER_Z = 0.35;
-const CAM_BACK = 4.6, CAM_H = 2.15, LOOK_Y = -1.1;         // camera sits behind the ball, looking at the goal
-const GRAB_PX = 0.13;                   // grab radius around the ball, as a fraction of the shortest screen side
-const KICK_DELAY = 0.14;                // seconds between release and the ball leaving the boot
+const CAM_BACK = 4.8, CAM_H = 2.2, LOOK_Y = -0.7;
+const GRAB_PX = 0.13;
+const KICK_DELAY = 0.14;
 
 const V3 = THREE.Vector3;
 const UP = new V3(0, 1, 0);
@@ -177,16 +171,15 @@ function resize() {
   fx.width = Math.round(W * DPR); fx.height = Math.round(H * DPR);
   fctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   const aspect = W / H;
-  // keep roughly 38 degrees of horizontal view on tall screens so the goal always fits
-  const vf = 2 * Math.atan(Math.tan(19 * Math.PI / 180) / aspect);
-  camera.fov = clamp(THREE.MathUtils.radToDeg(vf), 38, 62);
+  const vf = 2 * Math.atan(Math.tan(20 * Math.PI / 180) / aspect);
+  camera.fov = clamp(THREE.MathUtils.radToDeg(vf), 40, 64);
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
   if (typeof placeCamera === 'function' && state !== 'shot') { placeCamera(); computeReference(); }
 }
 
 /* ======================================================================
-   TEXTURES (all drawn on canvases, so the project has no image files)
+   TEXTURES
    ====================================================================== */
 function canvasTex(w, h, draw, opts = {}) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -198,9 +191,9 @@ function canvasTex(w, h, draw, opts = {}) {
   return t;
 }
 
-const PITCH_W = 68, PITCH_Z0 = -6, PITCH_Z1 = 54;       // pitch texture covers x -34..34, z -6..54
+const PITCH_W = 68, PITCH_Z0 = -6, PITCH_Z1 = 54;
 function makePitchTexture() {
-  const S = 30;                                           // pixels per metre
+  const S = 30;
   const w = PITCH_W * S, h = (PITCH_Z1 - PITCH_Z0) * S;
   return canvasTex(w, h, (g) => {
     const stripe = 5.5 * S;
@@ -208,20 +201,20 @@ function makePitchTexture() {
       g.fillStyle = i % 2 ? '#2f8a3c' : '#379944';
       g.fillRect(0, y, w, stripe);
     }
-    for (let i = 0; i < 26000; i++) {                     // grass grain
+    for (let i = 0; i < 26000; i++) {
       g.fillStyle = Math.random() < .5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.04)';
       g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 1);
     }
     const X = x => (x + PITCH_W / 2) * S, Z = z => (z - PITCH_Z0) * S;
     g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 0.13 * S; g.lineJoin = 'miter';
-    g.beginPath(); g.moveTo(X(-34), Z(0)); g.lineTo(X(34), Z(0)); g.stroke();                       // goal line
-    g.beginPath(); g.moveTo(X(-34), Z(0)); g.lineTo(X(-34), Z(PITCH_Z1)); g.stroke();               // touchlines
+    g.beginPath(); g.moveTo(X(-34), Z(0)); g.lineTo(X(34), Z(0)); g.stroke();
+    g.beginPath(); g.moveTo(X(-34), Z(0)); g.lineTo(X(-34), Z(PITCH_Z1)); g.stroke();
     g.beginPath(); g.moveTo(X(34), Z(0)); g.lineTo(X(34), Z(PITCH_Z1)); g.stroke();
-    g.strokeRect(X(-20.16), Z(0), 40.32 * S, 16.5 * S);                                             // penalty area
-    g.strokeRect(X(-9.16), Z(0), 18.32 * S, 5.5 * S);                                               // six-yard box
+    g.strokeRect(X(-20.16), Z(0), 40.32 * S, 16.5 * S);
+    g.strokeRect(X(-9.16), Z(0), 18.32 * S, 5.5 * S);
     g.fillStyle = 'rgba(255,255,255,.95)';
-    g.beginPath(); g.arc(X(0), Z(11), 0.2 * S, 0, Math.PI * 2); g.fill();                           // penalty spot
-    const a = Math.acos(5.5 / 9.15);                                                                // penalty arc
+    g.beginPath(); g.arc(X(0), Z(11), 0.2 * S, 0, Math.PI * 2); g.fill();
+    const a = Math.acos(5.5 / 9.15);
     g.beginPath(); g.arc(X(0), Z(11), 9.15 * S, Math.PI / 2 - a, Math.PI / 2 + a); g.stroke();
   });
 }
@@ -232,12 +225,12 @@ function makeCrowdTexture() {
     const cols = ['#d7192d', '#e8e8ee', '#1d5fc0', '#f2c744', '#7c8394', '#2b3347', '#fff', '#c41a2a', '#1b4a98'];
     for (let row = 0; row < 64; row++) {
       const y = row * 8 + 4;
-      g.fillStyle = row % 8 === 7 ? 'rgba(0,0,0,.55)' : 'rgba(0,0,0,0)'; g.fillRect(0, row * 8, w, 8);  // aisles
+      g.fillStyle = row % 8 === 7 ? 'rgba(0,0,0,.55)' : 'rgba(0,0,0,0)'; g.fillRect(0, row * 8, w, 8);
       for (let x = (row % 2) * 5; x < w; x += 10) {
         const c = Math.random() < 0.18 ? '#272f42' : pick(cols);
-        g.fillStyle = c; g.fillRect(x + 1, y, 8, 5);                                                // torso
+        g.fillStyle = c; g.fillRect(x + 1, y, 8, 5);
         g.fillStyle = pick(['#f1c9a5', '#d9a47f', '#a8714b', '#6e4730']);
-        g.beginPath(); g.arc(x + 5, y - 1.2, 2.3, 0, Math.PI * 2); g.fill();                         // head
+        g.beginPath(); g.arc(x + 5, y - 1.2, 2.3, 0, Math.PI * 2); g.fill();
       }
     }
   }, { repeat: true });
@@ -274,7 +267,7 @@ function makeNetTexture() {
 function makeBallTexture() {
   return canvasTex(512, 256, (g, w, h) => {
     g.fillStyle = '#f7f7f4'; g.fillRect(0, 0, w, h);
-    const phi = (1 + Math.sqrt(5)) / 2;                                    // dark patches at the 12 icosahedron corners
+    const phi = (1 + Math.sqrt(5)) / 2;
     const dirs = [];
     [[0, 1, phi], [0, -1, phi], [0, 1, -phi], [0, -1, -phi]].forEach(v => dirs.push(v));
     [[1, phi, 0], [-1, phi, 0], [1, -phi, 0], [-1, -phi, 0]].forEach(v => dirs.push(v));
@@ -304,7 +297,6 @@ function makeGlowTexture() {
    ====================================================================== */
 const lights = {};
 function buildStadium() {
-  // sky dome with a soft horizon glow and a few stars
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(420, 24, 14),
     new THREE.ShaderMaterial({
@@ -323,7 +315,6 @@ function buildStadium() {
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
   scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 1.6, color: 0xdfe8ff, sizeAttenuation: false, fog: false })));
 
-  // lights
   scene.add(new THREE.HemisphereLight(0xaec2ff, 0x1e3a22, 0.75));
   const sun = new THREE.DirectionalLight(0xfff1dc, 1.25);
   sun.position.set(-18, 34, 30);
@@ -336,7 +327,6 @@ function buildStadium() {
   const fill = new THREE.DirectionalLight(0x9db8ff, 0.35);
   fill.position.set(25, 12, 10); scene.add(fill);
 
-  // pitch
   const pitchTex = makePitchTexture();
   const pitch = new THREE.Mesh(
     new THREE.PlaneGeometry(PITCH_W, PITCH_Z1 - PITCH_Z0),
@@ -344,13 +334,12 @@ function buildStadium() {
   );
   pitch.rotation.x = -Math.PI / 2; pitch.position.set(0, 0, (PITCH_Z0 + PITCH_Z1) / 2);
   pitch.receiveShadow = true; scene.add(pitch);
-  const apron = new THREE.Mesh(                                 // dark grass beyond the touchlines and goal line
+  const apron = new THREE.Mesh(
     new THREE.PlaneGeometry(400, 400),
     new THREE.MeshStandardMaterial({ color: 0x1c4a26, roughness: 1 })
   );
   apron.rotation.x = -Math.PI / 2; apron.position.set(0, -0.02, 20); apron.receiveShadow = true; scene.add(apron);
 
-  // crowd + stands behind the goal and along the sides
   const crowdTex = makeCrowdTexture();
   const crowdMat = (rx, ry) => {
     const t = crowdTex.clone(); t.needsUpdate = true; t.repeat.set(rx, ry); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding;
@@ -361,25 +350,24 @@ function buildStadium() {
     const g = new THREE.Group();
     const len = Math.hypot(depth, rise);
     const slope = new THREE.Mesh(new THREE.PlaneGeometry(width, len), crowdMat(width / 40, len / 14));
-    slope.rotation.x = -(Math.PI / 2 - Math.atan2(rise, depth));           // tilt back, away from the pitch
+    slope.rotation.x = -(Math.PI / 2 - Math.atan2(rise, depth));
     slope.position.set(0, rise / 2 + 1.0, -(depth / 2) - start);
     g.add(slope);
     const front = new THREE.Mesh(new THREE.BoxGeometry(width, 1.6, 0.6), concrete);
     front.position.set(0, 0.8, -start); g.add(front);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(width, 0.7, depth * 0.62), concrete);
     roof.position.set(0, rise + 5.2, -(depth * 0.72) - start); g.add(roof);
-    for (let i = 0; i < Math.floor(width / 6); i++) {                       // glowing roof lamps
+    for (let i = 0; i < Math.floor(width / 6); i++) {
       const lamp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 0.5), new THREE.MeshBasicMaterial({ color: 0xfff4d6, fog: false }));
       lamp.position.set(-width / 2 + 3 + i * 6, rise + 4.7, -(depth * 0.4) - start); g.add(lamp);
     }
     g.position.set(x, 0, z); g.rotation.y = rotY;
     scene.add(g);
   }
-  stand(130, 0, -7.5, 0);                         // behind the goal
-  stand(90, -37, 25, Math.PI / 2, 20, 12, 0);     // left
-  stand(90, 37, 25, -Math.PI / 2, 20, 12, 0);     // right
+  stand(130, 0, -7.5, 0);
+  stand(90, -37, 25, Math.PI / 2, 20, 12, 0);
+  stand(90, 37, 25, -Math.PI / 2, 20, 12, 0);
 
-  // advertising boards
   const adTex = makeAdTexture();
   const adMat = new THREE.MeshStandardMaterial({ map: adTex, emissive: 0xffffff, emissiveMap: adTex, emissiveIntensity: 0.7, roughness: 0.6 });
   function board(len, x, z, rotY) {
@@ -392,7 +380,6 @@ function buildStadium() {
   board(70, -35.4, 28, Math.PI / 2);
   board(70, 35.4, 28, -Math.PI / 2);
 
-  // floodlight towers beyond the far stand
   const glow = makeGlowTexture();
   [[-24, -36], [24, -36], [-60, 10], [60, 10]].forEach(([x, z]) => {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 46, 8), concrete);
@@ -407,7 +394,6 @@ function buildStadium() {
 /* ======================================================================
    GOAL
    ====================================================================== */
-const goalNets = [];
 function buildGoal() {
   const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
   const post = (x) => {
@@ -418,7 +404,6 @@ function buildGoal() {
   const bar = new THREE.Mesh(new THREE.CylinderGeometry(POST, POST, GW + POST * 2, 12), white);
   bar.rotation.z = Math.PI / 2; bar.position.set(0, GH, 0); bar.castShadow = true; scene.add(bar);
 
-  // back frame: stays slim so the net reads clearly
   const back = new THREE.MeshStandardMaterial({ color: 0xdfe4ee, roughness: 0.5 });
   const rod = (a, b) => {
     const len = a.distanceTo(b);
@@ -435,7 +420,6 @@ function buildGoal() {
   rod(new V3(-HALF, GH - 0.25, -NET_TOP_BACK), new V3(HALF, GH - 0.25, -NET_TOP_BACK));
   rod(new V3(-HALF, 0.02, -NET_BACK), new V3(HALF, 0.02, -NET_BACK));
 
-  // net panels (UVs in metres so the mesh cells stay the same size everywhere)
   const netTex = makeNetTexture();
   const netMat = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, opacity: 0.8 });
   netTex.repeat.set(1, 1);
@@ -449,20 +433,17 @@ function buildGoal() {
     const m = new THREE.Mesh(geo, netMat); m.renderOrder = 5; scene.add(m);
   }
   const tl = (x, y, z) => new V3(x, y, z);
-  quad(tl(-HALF, GH, 0), tl(HALF, GH, 0), tl(HALF, GH - 0.25, -NET_TOP_BACK), tl(-HALF, GH - 0.25, -NET_TOP_BACK));  // roof
-  quad(tl(-HALF, GH - 0.25, -NET_TOP_BACK), tl(HALF, GH - 0.25, -NET_TOP_BACK), tl(HALF, 0, -NET_BACK), tl(-HALF, 0, -NET_BACK)); // back
-  [-HALF, HALF].forEach(x => {                                                                                    // sides
+  quad(tl(-HALF, GH, 0), tl(HALF, GH, 0), tl(HALF, GH - 0.25, -NET_TOP_BACK), tl(-HALF, GH - 0.25, -NET_TOP_BACK));
+  quad(tl(-HALF, GH - 0.25, -NET_TOP_BACK), tl(HALF, GH - 0.25, -NET_TOP_BACK), tl(HALF, 0, -NET_BACK), tl(-HALF, 0, -NET_BACK));
+  [-HALF, HALF].forEach(x => {
     quad(tl(x, 0, 0), tl(x, 0, -NET_BACK), tl(x, GH - 0.25, -NET_TOP_BACK), tl(x, GH, 0));
   });
-  // dark patch behind the net so it reads against the grass
-  const shade = new THREE.Mesh(new THREE.PlaneGeometry(GW, 0.01), new THREE.MeshBasicMaterial({ visible: false }));
-  scene.add(shade);
 }
 
 /* ======================================================================
-   PEOPLE (simple stylised players built from primitives)
+   PEOPLE
    ====================================================================== */
-const H0 = 0.95;                                   // hip pivot height; "body" rotates around this point
+const H0 = 0.95;
 function shirtTexture(kind, name) {
   return canvasTex(512, 256, (g, w, h) => {
     if (kind === 'twente') {
@@ -472,7 +453,7 @@ function shirtTexture(kind, name) {
         g.fillStyle = '#fff'; g.font = '700 30px Impact, "Arial Narrow", "Barlow Condensed", Arial, sans-serif';
         g.textAlign = 'center'; g.textBaseline = 'middle';
         const label = name.toUpperCase(), fit = Math.min(1, 118 / g.measureText(label).width);
-        for (const cx of [0, w]) {                                                              // the back of the shirt is u = 0 / 1
+        for (const cx of [0, w]) {
           g.save(); g.translate(cx, 70); g.scale(fit, 1); g.fillText(label, 0, 0); g.restore();
         }
       }
@@ -505,7 +486,6 @@ function makePerson(kitName, opts = {}) {
   };
   const cyl = (rt, rb, h, seg = 10) => new THREE.CylinderGeometry(rt, rb, h, seg);
 
-  // legs (pivot at the hip)
   const legs = [-1, 1].map(side => {
     const leg = new THREE.Group(); leg.position.set(side * 0.1, 0.92 - H0, 0); body.add(leg);
     add(leg, cyl(0.098, 0.086, 0.3), mat(kit.shorts), 0, -0.15, 0);
@@ -518,7 +498,6 @@ function makePerson(kitName, opts = {}) {
   const torso = add(body, new THREE.CylinderGeometry(0.215, 0.18, 0.56, 20, 1), [shirtSide, shirtFlat, shirtFlat], 0, 1.27 - H0, 0);
   torso.scale.set(1.12, 1, 0.7);
 
-  // arms (pivot at the shoulder)
   const arms = [-1, 1].map(side => {
     const arm = new THREE.Group(); arm.position.set(side * 0.27, 1.5 - H0, 0); body.add(arm);
     add(arm, new THREE.SphereGeometry(0.07, 10, 8), shirtFlat, 0, 0, 0);
@@ -528,7 +507,6 @@ function makePerson(kitName, opts = {}) {
     return arm;
   });
 
-  // head
   const head = new THREE.Group(); head.position.set(0, 1.71 - H0, 0); body.add(head);
   add(body, cyl(0.05, 0.055, 0.1), skin, 0, 1.59 - H0, 0, false);
   add(head, new THREE.SphereGeometry(0.115, 18, 14), skin, 0, 0, 0);
@@ -542,7 +520,7 @@ function makePerson(kitName, opts = {}) {
   return root;
 }
 
-function faceToward(obj, x, z) {          // models face -z by default
+function faceToward(obj, x, z) {
   obj.rotation.y = Math.atan2(-(x - obj.position.x), -(z - obj.position.z));
 }
 
@@ -554,7 +532,7 @@ function buildBall() {
   ballMesh = new THREE.Mesh(new THREE.SphereGeometry(VR, 24, 16), new THREE.MeshStandardMaterial({ map: makeBallTexture(), roughness: 0.45 }));
   ballMesh.castShadow = true; scene.add(ballMesh);
   const glow = makeGlowTexture();
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 20; i++) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
     s.visible = false; scene.add(s); trailSprites.push(s);
   }
@@ -563,22 +541,21 @@ function buildBall() {
 /* ======================================================================
    GAME STATE
    ====================================================================== */
-let state = 'aim';              // aim | drawing | shot | result | over
+let state = 'aim';
 let attempt = 0, goals = 0, shotLog = [];
 let result = null, resultT = 0, time = 0, shake = 0, slowmo = 1;
 let best = 0;
-try { best = parseInt(localStorage.getItem('fkh3d_best') || '0', 10) || 0; } catch (e) { /* storage may be blocked */ }
+try { best = parseInt(localStorage.getItem('fkh3d_best') || '0', 10) || 0; } catch (e) {}
 
-const B = new V3();                       // ball start spot
-const A = new V3(0, 0, -1);               // unit vector from the ball towards the goal (horizontal)
+const B = new V3();
+const A = new V3(0, 0, -1);
 const RIGHT = new V3(1, 0, 0);
 const ball = { pos: new V3(), vel: new V3(), prev: new V3(), inNet: false };
 const camBase = new V3();
 let wall = [], keeper, striker, goalCelebrate = 0;
 let raw = [], drawStart = 0;
-let path = null, travel = 0, shotSpeed = 22, shotClock = 0;
-let ref = null;                           // screen/world reference for building shots
-let hintTimer = 0;
+let path = null, travel = 0, shotSpeed = 23, shotClock = 0;
+let ref = null;
 
 let stadiumBuilt = false;
 
@@ -586,7 +563,6 @@ function ensureWorld() {
   if (stadiumBuilt) return;
   stadiumBuilt = true;
   buildStadium(); buildGoal(); buildBall();
-  // keeper
   keeper = { obj: makePerson('keeper', { skin: 0xd9a47f, hair: 0x2b1d12 }), x: 0, vx: 0, targetX: 0, locked: false, committed: false, react: 0, adapt: 0, speed: 5, err: 0, lean: 0, dir: 0, jump: 0 };
   scene.add(keeper.obj);
   striker = { obj: makePerson('twente', { name: CFG.playerName, skin: 0xedc3a0, hair: 0xb98a4c }), t: -1, start: new V3(), end: new V3(), cel: 0 };
@@ -595,12 +571,11 @@ function ensureWorld() {
 
 function newAttempt() {
   ensureWorld();
-  const bx = rand(-9, 9), bz = rand(15.5, 20.5);
+  const bx = rand(-8.5, 8.5), bz = rand(17.0, 21.5);
   B.set(bx, R, bz);
   A.set(-bx, 0, -bz).normalize();
   RIGHT.set(-A.z, 0, A.x);
 
-  // wall on the line between ball and goal centre
   wall.forEach(w => scene.remove(w.obj));
   wall = [];
   const n = Math.min(5, 3 + Math.floor(attempt / 2));
@@ -608,24 +583,24 @@ function newAttempt() {
   const skins = [0xf0c8a4, 0xe0ac85, 0xc58a62, 0x8d5a3b, 0xf6d7bb];
   const hairs = [0x2b1d12, 0x5a3a1e, 0xb88a4a, 0x111111, 0x8a8a8a];
   for (let i = 0; i < n; i++) {
-    const o = makePerson('heerenveen', { skin: pick(skins), hair: pick(hairs), scale: rand(0.96, 1.04) });
+    const o = makePerson('heerenveen', { skin: pick(skins), hair: pick(hairs), scale: rand(0.97, 1.03) });
     const p = c.clone().addScaledVector(RIGHT, (i - (n - 1) / 2) * WALL_SP);
     o.position.set(p.x, 0, p.z); faceToward(o, B.x, B.z);
     const u = o.userData;
-    u.arms[0].rotation.set(0.55, 0, 0.32); u.arms[1].rotation.set(0.55, 0, -0.32);   // hands protecting the groin
+    u.arms[0].rotation.set(0.55, 0, 0.32); u.arms[1].rotation.set(0.55, 0, -0.32);
     scene.add(o);
     wall.push({ obj: o, x: p.x, z: p.z, jump: 0 });
   }
 
-  // keeper
-  Object.assign(keeper, { x: 0, vx: 0, targetX: 0, locked: false, committed: false, lean: 0, dir: 0, jump: 0,
-    react: 0.46 - 0.04 * SKILL,                     // seconds before he reads the ball's direction
-    adapt: 0.03 + 0.03 * SKILL,                     // after that he can still adjust for a short while, then he is committed
-    speed: 1.8 + 0.5 * SKILL + 0.1 * attempt,       // sideways speed (m/s)
-    err: rand(-1, 1) * (1.9 - 0.25 * SKILL) });     // misjudgement of where the ball will cross the line (m)
+  Object.assign(keeper, {
+    x: 0, vx: 0, targetX: 0, locked: false, committed: false, lean: 0, dir: 0, jump: 0,
+    react: 0.44 - 0.04 * SKILL,
+    adapt: 0.04 + 0.03 * SKILL,
+    speed: 2.1 + 0.52 * SKILL + 0.08 * attempt,
+    err: rand(-1, 1) * (1.6 - 0.23 * SKILL)
+  });
   keeper.obj.position.set(0, 0, KEEPER_Z); keeper.obj.rotation.set(0, 0, 0); faceToward(keeper.obj, B.x, B.z);
 
-  // striker stands just behind and to the left of the ball
   const sp = B.clone().addScaledVector(RIGHT, -1.7).addScaledVector(A, -1.3);
   const ep = B.clone().addScaledVector(RIGHT, -0.62).addScaledVector(A, -0.4);
   striker.start.copy(sp); striker.end.copy(ep); striker.t = -1; striker.cel = 0;
@@ -640,7 +615,7 @@ function newAttempt() {
   state = 'aim';
   placeCamera(); computeReference();
   hideBanner();
-  setHint(attempt === 0 ? 'Drag from the ball and curve your shot around the wall' : 'Drag from the ball to take your free kick', true);
+  setHint(attempt === 0 ? 'Drag from the ball. Draw high or curve around the wall!' : 'Drag from the ball to take your free kick', true);
   updateHUD();
 }
 
@@ -661,67 +636,46 @@ function placeCamera() {
 }
 
 const _v = new V3();
-function project(p) {                                       // world -> CSS pixels
+function project(p) {
   _v.copy(p).project(camera);
   return { x: (_v.x * 0.5 + 0.5) * W, y: (-_v.y * 0.5 + 0.5) * H, z: _v.z };
 }
-function rayDir(px, py, out) {                              // CSS pixel -> world ray direction
+function rayDir(px, py, out) {
   out.set((px / W) * 2 - 1, -(py / H) * 2 + 1, 0.5).unproject(camera).sub(camera.position).normalize();
   return out;
 }
 
-/* A drawn line on the screen only gives x and y. The depth comes from how far along the line
-   the ball is: after one "goal-distance" of drawing (the length from the ball to the middle
-   of the goal on screen) the ball reaches the goal. The depth curve is taken from a ground
-   line between the ball and the goal, so a line drawn straight at the goal rolls along the
-   grass, and a line drawn above it lifts the ball. */
 function computeReference() {
   const ballScr = project(B);
   const goalMid = project(new V3(0, GH / 2, 0));
-  const ballGround = project(new V3(B.x, 0, B.z));
   const goalGround = project(new V3(0, 0, 0));
-  const L = Math.hypot(goalMid.x - ballScr.x, goalMid.y - ballScr.y);
-  const N = 48, table = [];
-  const dir = new V3();
+  const L = Math.max(10, Math.hypot(goalMid.x - ballScr.x, goalMid.y - ballScr.y));
+  const Dg = Math.hypot(B.x, B.z);
   const camRel = camera.position.clone().sub(B).dot(A);
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;
-    const px = lerp(ballGround.x, goalGround.x, t), py = lerp(ballGround.y, goalGround.y, t);
-    rayDir(px, py, dir);
-    const s = (0 - camera.position.y) / dir.y;
-    const gp = camera.position.clone().addScaledVector(dir, s);
-    table.push(gp.sub(B).dot(A));
-  }
-  table[0] = 0;
-  ref = { ballScr, goalMid, L, table, N, camRel, Dg: Math.hypot(B.x, B.z) };
-  table[N] = ref.Dg;
-}
-function depthAt(t) {                                       // distance along A from the ball for path fraction t
-  const { table, N } = ref;
-  if (t <= 0) return 0;
-  if (t >= 1) { const slope = (table[N] - table[N - 2]) / (2 / N); return table[N] + slope * (t - 1); }
-  const f = t * N, i = Math.floor(f);
-  return lerp(table[i], table[i + 1], f - i);
+  ref = { ballScr, goalMid, goalGround, L, Dg, camRel };
 }
 
 /* ======================================================================
-   INPUT (mouse and touch through pointer events)
+   INPUT
    ====================================================================== */
-function ptr(e) { const r = fx.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
+function ptr(e) {
+  const r = fx.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+}
 
 fx.addEventListener('pointerdown', e => {
   e.preventDefault();
   const p = ptr(e);
   if (state === 'aim') {
     const b = project(ball.pos);
-    if (Math.hypot(p.x - b.x, p.y - b.y) <= Math.max(52, GRAB_PX * Math.min(W, H) * 1.6)) {
+    if (Math.hypot(p.x - b.x, p.y - b.y) <= Math.max(54, GRAB_PX * Math.min(W, H) * 1.6)) {
       state = 'drawing'; raw = [{ x: b.x, y: b.y }]; drawStart = performance.now();
-      try { fx.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      try { fx.setPointerCapture(e.pointerId); } catch (err) {}
       setHint('', false);
     } else {
       setHint('Start your drag on the ball', true, 1800);
     }
-  } else if (state === 'result' && resultT > 0.7) {
+  } else if (state === 'result' && resultT > 0.6) {
     nextAttempt();
   }
 });
@@ -729,7 +683,9 @@ fx.addEventListener('pointermove', e => {
   if (state !== 'drawing') return;
   e.preventDefault();
   const p = ptr(e), last = raw[raw.length - 1];
-  if (Math.hypot(p.x - last.x, p.y - last.y) > 5 && raw.length < 500) raw.push({ x: clamp(p.x, 0, W), y: clamp(p.y, 0, H) });
+  if (Math.hypot(p.x - last.x, p.y - last.y) > 4 && raw.length < 600) {
+    raw.push({ x: clamp(p.x, 0, W), y: clamp(p.y, 0, H) });
+  }
 });
 window.addEventListener('pointerup', () => { if (state === 'drawing') release(); });
 window.addEventListener('pointercancel', () => { if (state === 'drawing') { state = 'aim'; raw = []; } });
@@ -737,9 +693,12 @@ fx.addEventListener('contextmenu', e => e.preventDefault());
 $('again').addEventListener('click', restart);
 
 /* ======================================================================
-   SHOT PATH
+   SHOT PATH (ALLOWS LEAVING GROUND, CLEARING WALL, OVER/UNDER GOAL)
    ====================================================================== */
-function polyLen(pts) { let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return l; }
+function polyLen(pts) {
+  let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  return l;
+}
 function smooth(pts, passes) {
   let a = pts;
   for (let k = 0; k < passes; k++) {
@@ -769,29 +728,48 @@ function resample(pts, step) {
 function buildPath(rawPts) {
   const step = Math.max(3, Math.min(W, H) * 0.009);
   const pts = resample(smooth(rawPts, 3), step);
-  // keep going in the final direction of the drawn line
+
+  // Extend line beyond release point in the drag direction
   const n = pts.length, from = pts[Math.max(0, n - 8)], last = pts[n - 1];
-  let dx = last.x - from.x, dy = last.y - from.y; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+  let dx = last.x - from.x, dy = last.y - from.y;
+  const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
   let len = polyLen(pts);
-  const maxLen = ref.L * 2.4;
+  const maxLen = ref.L * 2.5;
   let cur = last;
   while (len < maxLen) { cur = { x: cur.x + dx * step, y: cur.y + dy * step }; pts.push(cur); len += step; }
+
+  // Screen length fraction corresponds to progression toward the goal line
+  const drawnLength = polyLen(rawPts);
+  const powerScale = clamp(drawnLength / (ref.L * 0.95), 0.65, 1.45);
 
   const P = [], cum = [0], dir = new V3();
   let s = 0;
   for (let i = 0; i < pts.length; i++) {
     if (i > 0) s += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-    const d = depthAt(s / ref.L);
+    const u = (s / ref.L) * powerScale;
+    const distZ = u * ref.Dg;
+
+    // Raycast through screen point at distance distZ
     rayDir(pts[i].x, pts[i].y, dir);
-    const k = (d - ref.camRel) / dir.dot(A);               // distance along the ray to the plane "d metres from the ball"
+    const k = (distZ - ref.camRel) / dir.dot(A);
     const p = camera.position.clone().addScaledVector(dir, Math.max(0.1, k));
+
+    // Natural ball dip & arc over wall
+    // High drag adds natural ball lift at the wall followed by gravitational dip towards goal
+    const wallU = WALL_DIST / ref.Dg;
+    const arcHeight = Math.sin(clamp(u / 1.1, 0, 1) * Math.PI) * 0.6;
+    if (u > 0.08) {
+      p.y += arcHeight;
+    }
     p.y = Math.max(R, p.y);
+
     P.push(p);
     if (i > 0) cum.push(cum[i - 1] + p.distanceTo(P[i - 1]));
   }
   P[0].copy(B);
   return { P, cum, total: cum[cum.length - 1], idx: 0 };
 }
+
 function posAt(pa, sd, out) {
   const n = pa.P.length - 1;
   if (sd >= pa.total) {
@@ -807,14 +785,14 @@ function posAt(pa, sd, out) {
 
 function release() {
   const len = polyLen(raw);
-  if (len < Math.min(W, H) * 0.12 || raw.length < 3) {
+  if (len < Math.min(W, H) * 0.1 || raw.length < 3) {
     state = 'aim'; raw = [];
-    setHint('Drag further to draw your shot', true, 1800);
+    setHint('Drag further towards or over the goal', true, 1800);
     return;
   }
   const elapsed = Math.max(0.12, (performance.now() - drawStart) / 1000);
-  const pxPerSec = len / elapsed / Math.min(W, H) * 480;              // normalised so phones and desktops feel the same
-  shotSpeed = lerp(17, 31, clamp((pxPerSec - 250) / 1400, 0, 1));    // faster flick = harder shot (m/s)
+  const pxPerSec = len / elapsed / Math.min(W, H) * 480;
+  shotSpeed = lerp(19, 32, clamp((pxPerSec - 250) / 1400, 0, 1));
   raw[0] = project(ball.pos);
   path = buildPath(raw);
   travel = 0; shotClock = -KICK_DELAY; striker.t = 0;
@@ -829,51 +807,77 @@ function stepShot(h) {
   shotClock += h;
   if (shotClock < 0) return;
   ball.prev.copy(ball.pos);
-  travel += shotSpeed * (1 - 0.15 * clamp(travel / 40, 0, 1)) * h;
+  travel += shotSpeed * (1 - 0.12 * clamp(travel / 40, 0, 1)) * h;
   posAt(path, travel, ball.pos);
   ball.vel.copy(ball.pos).sub(ball.prev).divideScalar(h);
   spinBall(ball.pos.distanceTo(ball.prev));
 
-  // 1. the wall (the players jump just as the ball is struck)
+  // 1. Defending Wall: Beat or Collide
   for (const w of wall) {
     const dx = ball.pos.x - w.x, dz = ball.pos.z - w.z, d = Math.hypot(dx, dz);
-    if (d < WALL_R + R && ball.pos.y < WALL_H + w.jump + R) {
+    const wallTop = WALL_H + w.jump;
+    // Ball clears if it rises above wallTop + R
+    if (d < WALL_R + R && ball.pos.y < wallTop + R) {
       const nx = dx / (d || 1), nz = dz / (d || 1), dot = ball.vel.x * nx + ball.vel.z * nz;
-      ball.vel.x = (ball.vel.x - 2 * dot * nx) * 0.4; ball.vel.z = (ball.vel.z - 2 * dot * nz) * 0.4;
-      ball.vel.y = Math.abs(ball.vel.y) * 0.3 + 2.5;
-      ball.pos.x = w.x + nx * (WALL_R + R + 0.02); ball.pos.z = w.z + nz * (WALL_R + R + 0.02);
+      ball.vel.x = (ball.vel.x - 2 * dot * nx) * 0.42;
+      ball.vel.z = (ball.vel.z - 2 * dot * nz) * 0.42;
+      ball.vel.y = Math.abs(ball.vel.y) * 0.35 + 2.4;
+      ball.pos.x = w.x + nx * (WALL_R + R + 0.04);
+      ball.pos.z = w.z + nz * (WALL_R + R + 0.04);
       return finish('blocked');
     }
   }
-  // 2. the keeper: his reach grows when he is stretching sideways
-  if (Math.abs(ball.pos.z - KEEPER_Z) < 0.55 && ball.vel.z < 0) {
-    const ax = 0.5 + 0.7 * keeper.lean, ay = 0.95 + 0.3 * keeper.lean;
-    const cy = 1.0 + 0.2 * keeper.lean + keeper.jump * 0.5;
+
+  // 2. Goalkeeper Diving Reach
+  if (Math.abs(ball.pos.z - KEEPER_Z) < 0.6 && ball.vel.z < 0) {
+    const ax = 0.55 + 0.8 * keeper.lean;
+    const ay = 0.95 + 0.35 * keeper.lean;
+    const cy = 1.0 + 0.25 * keeper.lean + keeper.jump * 0.65;
     const q = Math.pow((ball.pos.x - keeper.x) / ax, 2) + Math.pow((ball.pos.y - cy) / ay, 2);
     if (q < 1) {
-      const sp = Math.max(4, ball.vel.length() * 0.28);
-      ball.vel.set(rand(-1, 1) * sp, rand(1, 3.5), Math.abs(rand(0.5, 1)) * sp);
+      const sp = Math.max(4.5, ball.vel.length() * 0.32);
+      ball.vel.set(rand(-1, 1) * sp, rand(1.5, 4.0), Math.abs(rand(0.6, 1.2)) * sp);
       return finish('saved');
     }
   }
-  // 3. crossing the goal line
+
+  // 3. Crossing the Goal Line (Goal, Over, Post, Bar, Wide)
   if (ball.prev.z > 0 && ball.pos.z <= 0) {
     const f = ball.prev.z / (ball.prev.z - ball.pos.z);
-    const x = lerp(ball.prev.x, ball.pos.x, f), y = lerp(ball.prev.y, ball.pos.y, f);
+    const x = lerp(ball.prev.x, ball.pos.x, f);
+    const y = lerp(ball.prev.y, ball.pos.y, f);
     const rr = POST + R;
-    if (Math.abs(x) < HALF + rr && y > GH - rr && y < GH + rr) {
-      ball.vel.set(rand(-1.5, 1.5), 1.5, Math.abs(ball.vel.z) * 0.35); return finish('bar');
+
+    // Crossbar collision
+    if (Math.abs(x) <= HALF + rr && y >= GH - rr && y <= GH + rr) {
+      ball.vel.set(rand(-1.5, 1.5), 1.5, Math.abs(ball.vel.z) * 0.35);
+      return finish('bar');
     }
-    if (y >= GH + rr) return finish('over');
-    if (Math.abs(x) < HALF - rr) {
-      ball.vel.multiplyScalar(0.45); ball.inNet = true; return finish('goal');
+
+    // Over the crossbar
+    if (Math.abs(x) <= HALF + 1.2 && y > GH + rr) {
+      return finish('over');
     }
-    if (Math.abs(Math.abs(x) - HALF) <= rr) {
-      ball.vel.set(Math.sign(x) * rand(1, 3), 1, Math.abs(ball.vel.z) * 0.35); return finish('post');
+
+    // Inside the woodwork
+    if (Math.abs(x) < HALF - rr && y > R && y < GH - rr) {
+      ball.vel.multiplyScalar(0.4);
+      ball.inNet = true;
+      return finish('goal');
     }
+
+    // Side posts
+    if (Math.abs(Math.abs(x) - HALF) <= rr && y <= GH + rr) {
+      ball.vel.set(Math.sign(x) * rand(1.2, 3.2), 1.2, Math.abs(ball.vel.z) * 0.35);
+      return finish('post');
+    }
+
     return finish('wide');
   }
-  if (ball.pos.z < -6 || Math.abs(ball.pos.x) > 40 || ball.pos.y > 40 || ball.pos.z > 60) finish('wide');
+
+  if (ball.pos.z < -6 || Math.abs(ball.pos.x) > 36 || ball.pos.y > 36 || ball.pos.z > 55) {
+    finish('wide');
+  }
 }
 
 function stepLoose(h) {
@@ -884,8 +888,10 @@ function stepLoose(h) {
     if (ball.vel.y < -1) ball.vel.y *= -0.5; else ball.vel.y = 0;
     ball.vel.x *= 0.85; ball.vel.z *= 0.85;
   }
-  if (ball.pos.y <= R + 0.001) { const f = Math.exp(-1.6 * h); ball.vel.x *= f; ball.vel.z *= f; }
-  if (ball.inNet) {                                            // the net catches the ball
+  if (ball.pos.y <= R + 0.001) {
+    const f = Math.exp(-1.6 * h); ball.vel.x *= f; ball.vel.z *= f;
+  }
+  if (ball.inNet) {
     const bz = -(NET_BACK - 0.25 - R);
     if (ball.pos.z < bz) { ball.pos.z = bz; ball.vel.z = Math.abs(ball.vel.z) * 0.12; ball.vel.x *= 0.5; }
     const sx = HALF - R;
@@ -906,13 +912,13 @@ function spinBall(dist) {
 }
 
 const BANNERS = {
-  goal:    ['GOAL!', 'What a free kick!', '#ffd23f'],
-  saved:   ['SAVED!', 'The keeper got there', '#ffffff'],
-  blocked: ['BLOCKED!', 'Curve it around the wall', '#ffffff'],
-  wide:    ['WIDE!', 'Just off target', '#ffffff'],
-  over:    ['OVER THE BAR!', 'A little too much power', '#ffffff'],
-  post:    ['OFF THE POST!', 'So close', '#ffffff'],
-  bar:     ['OFF THE BAR!', 'So close', '#ffffff']
+  goal:    ['GOAL!', 'What a stunning free kick!', '#ffd23f'],
+  saved:   ['SAVED!', 'Keeper pulled off a great save', '#ffffff'],
+  blocked: ['BLOCKED BY THE WALL!', 'Lift the shot higher or curve around', '#ffffff'],
+  wide:    ['WIDE!', 'Just missed the target', '#ffffff'],
+  over:    ['OVER THE BAR!', 'Too much elevation on that one', '#ffffff'],
+  post:    ['OFF THE POST!', 'Denied by the woodwork', '#ffffff'],
+  bar:     ['OFF THE CROSSBAR!', 'Inches away from glory', '#ffffff']
 };
 
 function finish(r) {
@@ -928,7 +934,7 @@ function nextAttempt() {
   hideBanner();
   if (attempt >= SHOTS) {
     state = 'over';
-    if (goals > best) { best = goals; try { localStorage.setItem('fkh3d_best', String(best)); } catch (e) { /* ignore */ } }
+    if (goals > best) { best = goals; try { localStorage.setItem('fkh3d_best', String(best)); } catch (e) {} }
     const ratio = goals / SHOTS;
     $('oScore').textContent = goals + '/' + SHOTS;
     $('oMsg').textContent = ratio === 1 ? 'Perfect round. Absolutely clinical!' : ratio >= 0.6 ? 'Great set-piece taking!' : goals > 0 ? 'Not bad. Keep practising!' : 'Not your day. Try again!';
@@ -946,14 +952,13 @@ function updateKeeper(h) {
   const old = k.x;
   if (state === 'shot' && shotClock >= 0 && !k.locked) {
     if (shotClock > k.react && ball.vel.z < -1) {
-      // he reads the ball's *current* direction, so a late curve can fool him
       const tt = ball.pos.z / -ball.vel.z;
       const px = ball.pos.x + ball.vel.x * tt, py = ball.pos.y + ball.vel.y * tt;
-      if (Math.abs(px) > HALF + 0.4) {                      // heading wide of the post: he only shuffles across
+      if (Math.abs(px) > HALF + 0.4) {
         k.targetX = clamp(px * 0.3, -1.3, 1.3); k.jump = 0;
       } else {
         k.targetX = clamp(px + k.err, -HALF + 0.2, HALF - 0.2);
-        k.jump = py > 1.6 ? 1 : 0;
+        k.jump = py > 1.45 ? 1 : 0;
       }
       k.committed = true;
       if (shotClock > k.react + k.adapt) k.locked = true;
@@ -969,47 +974,47 @@ function updateKeeper(h) {
     k.x += clamp(0 - k.x, -1.5 * h, 1.5 * h);
   }
   k.vx = (k.x - old) / h;
-  const diving = k.committed && Math.abs(k.targetX - k.x) > 0.05 || Math.abs(k.vx) > 2;
   const want = k.committed ? clamp(Math.abs(k.vx) / 4.5, 0, 1) * (Math.abs(k.targetX) > 0.9 ? 1 : 0.45) : 0;
   k.lean = lerp(k.lean, want, Math.min(1, 12 * h));
   if (k.vx !== 0) k.dir = lerp(k.dir, Math.sign(k.vx), Math.min(1, 14 * h));
   if (!k.committed) k.dir = lerp(k.dir, 0, Math.min(1, 6 * h));
-  // pose
+
   const u = k.obj.userData, o = k.obj;
   o.position.x = k.x;
   const lean = k.lean;
-  u.body.rotation.z = (state === 'shot' || state === 'result') ? -k.dir * lean * 1.25 * Math.sign(1) : 0;
-  u.body.position.y = H0 + 0.28 * lean + (k.jump ? 0.18 : 0);
-  const up = clamp(lean * 1.2 + (k.jump ? 0.5 : 0), 0, 1);
+  u.body.rotation.z = (state === 'shot' || state === 'result') ? -k.dir * lean * 1.25 : 0;
+  u.body.position.y = H0 + 0.28 * lean + (k.jump ? 0.24 : 0);
+  const up = clamp(lean * 1.2 + (k.jump ? 0.6 : 0), 0, 1);
   const ready = (state === 'aim' || state === 'drawing') ? 0.38 + Math.sin(time * 3) * 0.04 : 0.45;
-  u.arms[0].rotation.set(0.25, 0, -lerp(ready, 2.7, up)); u.arms[1].rotation.set(0.25, 0, lerp(ready, 2.7, up));
-  u.legs[0].rotation.set(0, 0, lerp(-0.18, -0.6, lean)); u.legs[1].rotation.set(0, 0, lerp(0.18, 0.6, lean));
-  void diving;
+  u.arms[0].rotation.set(0.25, 0, -lerp(ready, 2.7, up));
+  u.arms[1].rotation.set(0.25, 0, lerp(ready, 2.7, up));
+  u.legs[0].rotation.set(0, 0, lerp(-0.18, -0.6, lean));
+  u.legs[1].rotation.set(0, 0, lerp(0.18, 0.6, lean));
 }
 
 /* ======================================================================
-   ANIMATION OF THE OTHER PLAYERS
+   ANIMATION
    ====================================================================== */
 function updateStriker(h) {
   const s = striker, u = s.obj.userData;
-  const t = s.t;
   if (state === 'aim' || state === 'drawing') {
     u.legs[0].rotation.x = Math.sin(time * 2) * 0.03; u.legs[1].rotation.x = 0;
     u.arms[0].rotation.set(0, 0, -0.12); u.arms[1].rotation.set(0, 0, 0.12);
     u.body.position.y = H0 + Math.sin(time * 2.4) * 0.008;
     return;
   }
-  if (t >= 0 && state !== 'over') {
+  if (s.t >= 0 && state !== 'over') {
     s.t += h;
     const run = clamp(s.t / KICK_DELAY, 0, 1), e = easeOut(run);
-    const away = easeOut(clamp((s.t - KICK_DELAY - 0.2) / 2.2, 0, 1));                      // after the kick he jogs off to the side
+    const away = easeOut(clamp((s.t - KICK_DELAY - 0.2) / 2.2, 0, 1));
     s.obj.position.x = lerp(s.start.x, s.end.x, e) + (-RIGHT.x * 1.2 + A.x * 3.5) * away;
     s.obj.position.z = lerp(s.start.z, s.end.z, e) + (-RIGHT.z * 1.2 + A.z * 3.5) * away;
     const swing = s.t < KICK_DELAY ? -0.9 * run : lerp(-0.9, 1.35, easeOut(clamp((s.t - KICK_DELAY) / 0.12, 0, 1)));
     const follow = clamp((s.t - KICK_DELAY - 0.25) / 0.6, 0, 1);
     u.legs[1].rotation.x = lerp(swing, 0.2, follow);
     u.legs[0].rotation.x = lerp(-0.12, 0.05, run);
-    u.arms[0].rotation.set(lerp(0, 0.7, clamp(run, 0, 1)), 0, -0.4); u.arms[1].rotation.set(lerp(0, -0.6, run), 0, 0.5);
+    u.arms[0].rotation.set(lerp(0, 0.7, clamp(run, 0, 1)), 0, -0.4);
+    u.arms[1].rotation.set(lerp(0, -0.6, run), 0, 0.5);
     u.body.rotation.x = lerp(0, -0.12, run) * (1 - follow);
     u.body.position.y = H0;
   }
@@ -1020,7 +1025,7 @@ function updateStriker(h) {
     u.arms[0].rotation.set(0, 0, -2.7); u.arms[1].rotation.set(0, 0, 2.7);
     u.legs[1].rotation.x = 0;
   } else if (state === 'result' && s.t > 0.6) {
-    u.arms[0].rotation.set(-2.5, 0, -0.3); u.arms[1].rotation.set(-2.5, 0, 0.3);   // hands on head
+    u.arms[0].rotation.set(-2.5, 0, -0.3); u.arms[1].rotation.set(-2.5, 0, 0.3);
   }
 }
 
@@ -1028,7 +1033,7 @@ function updateWall(h) {
   for (const w of wall) {
     if (state === 'shot' && shotClock > -0.02) {
       const tj = shotClock + 0.02;
-      w.jump = tj < 0.6 ? 0.34 * Math.sin(Math.PI * tj / 0.6) : 0;
+      w.jump = tj < 0.62 ? 0.36 * Math.sin(Math.PI * tj / 0.62) : 0;
     } else if (state !== 'result') w.jump = 0;
     else if (w.jump > 0) w.jump = Math.max(0, w.jump - 2 * h);
     w.obj.position.y = w.jump;
@@ -1044,7 +1049,11 @@ const hint = $('hint');
 function setHint(text, show, ms) {
   clearTimeout(setHint.t);
   hint.textContent = text; hint.classList.toggle('hide', !show || !text);
-  if (show && ms) setHint.t = setTimeout(() => { if (state === 'aim') setHint(attempt === 0 ? 'Drag from the ball and curve your shot around the wall' : 'Drag from the ball to take your free kick', true); }, ms);
+  if (show && ms) {
+    setHint.t = setTimeout(() => {
+      if (state === 'aim') setHint(attempt === 0 ? 'Drag from the ball. Draw high or curve around the wall!' : 'Drag from the ball to take your free kick', true);
+    }, ms);
+  }
 }
 function showBanner(r) {
   const [title, sub, col] = BANNERS[r], b = $('banner');
@@ -1058,11 +1067,17 @@ function updateHUD() {
   $('goals').textContent = goals;
   $('shotn').textContent = Math.min(attempt + 1, SHOTS); $('shotsTotal').textContent = SHOTS;
   const pips = $('pips');
-  if (pips.children.length !== SHOTS) { pips.innerHTML = ''; for (let i = 0; i < SHOTS; i++) { const d = document.createElement('div'); d.className = 'pip'; pips.appendChild(d); } }
-  [...pips.children].forEach((d, i) => { d.className = 'pip' + (shotLog[i] === 'goal' ? ' goal' : shotLog[i] === 'miss' ? ' miss' : ''); });
+  if (pips.children.length !== SHOTS) {
+    pips.innerHTML = '';
+    for (let i = 0; i < SHOTS; i++) {
+      const d = document.createElement('div'); d.className = 'pip'; pips.appendChild(d);
+    }
+  }
+  [...pips.children].forEach((d, i) => {
+    d.className = 'pip' + (shotLog[i] === 'goal' ? ' goal' : shotLog[i] === 'miss' ? ' miss' : '');
+  });
 }
 
-/* 2D overlay: ring around the ball, and the line being drawn */
 function drawOverlay() {
   fctx.clearRect(0, 0, W, H);
   if (state === 'aim') {
@@ -1111,8 +1126,11 @@ function update(dt) {
     else if (state === 'result') stepLoose(h);
   }
   updateKeeper(dt); updateStriker(dt); updateWall(dt);
-  if (state === 'result') { resultT += dt / Math.max(slowmo, 0.01) * slowmo; if (slowmo < 1 && resultT > 0.9) slowmo = Math.min(1, slowmo + dt * 1.5); }
-  if (state === 'result' && resultT > 2.7) nextAttempt();
+  if (state === 'result') {
+    resultT += dt / Math.max(slowmo, 0.01) * slowmo;
+    if (slowmo < 1 && resultT > 0.9) slowmo = Math.min(1, slowmo + dt * 1.5);
+  }
+  if (state === 'result' && resultT > 2.8) nextAttempt();
 
   ballMesh.position.copy(ball.pos);
   if (state === 'shot' || state === 'result') {
@@ -1125,13 +1143,12 @@ function update(dt) {
     s.visible = true; s.position.copy(p); s.material.opacity = 0.28 * f; s.scale.setScalar(0.12 + 0.34 * f);
   });
   updateCamera(dt);
-  // keep the shadow frustum around the action
   lights.sun.position.set(B.x - 14, 34, B.z + 14); lights.sun.target.position.set(B.x * 0.5, 0, B.z * 0.55 - 2); lights.sun.target.updateMatrixWorld();
 }
 
 let last = null;
 function frame(now) {
-  if (window.__FK_MANUAL) { requestAnimationFrame(frame); return; }            // automated tests step the game themselves
+  if (window.__FK_MANUAL) { requestAnimationFrame(frame); return; }
   if (last === null) last = now;
   const dt = clamp((now - last) / 1000, 0.001, 0.05); last = now;
   update(dt * (state === 'result' ? slowmo : 1) || dt);
@@ -1146,7 +1163,6 @@ resize();
 newAttempt();
 requestAnimationFrame(frame);
 
-// small hook so the game can be driven by automated tests
 window.__FK = {
   get state() { return state; }, get result() { return result; }, get goals() { return goals; }, get attempt() { return attempt; },
   ball, wall: () => wall, keeper: () => keeper, project: p => project(new V3(p.x, p.y, p.z)), ref: () => ref, B, A,
