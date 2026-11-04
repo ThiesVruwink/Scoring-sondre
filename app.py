@@ -1193,11 +1193,4 @@ requestAnimationFrame(animate);
 
 components.html(game_html, height=830, scrolling=False)
 
-st.markdown(
-    """
-    ### 🎮 Upgraded Mechanics:
-    * **Balanced Goalkeeper:** Humanized with a 180ms reflex delay and a realistic 1.15m catch radius. Well-placed shots into the top corners or side netting will consistently beat him!
-    * **Lead Passes / Running into Space:** You no longer need to pass directly to a player's feet. If you curl a ball into open turf ahead of **Ørjasæter** or **Weghorst**, they will sprint to collect the through-ball and maintain possession.
-    * **Woven Stadium Net:** Features deep-box European netting with diamond weave textures, dual back stanchions, and vertex canopy sagging.
-    """
-)
+
