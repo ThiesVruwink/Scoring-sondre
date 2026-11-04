@@ -14,7 +14,7 @@ st.markdown(
             🔴 FC Twente 3D: Hero Matchday 🔵
         </h1>
         <p style="font-weight: 600; color: #555; margin-top: 0.2rem; font-size: 0.95rem;">
-            Sondre Ørjasæter (27) & Wout Weghorst (9) vs SC Heerenveen
+            Sondre Ørjasæter (11) & Wout Weghorst (9) vs SC Heerenveen
         </p>
     </div>
     """,
@@ -182,9 +182,9 @@ game_html = """
       <span style="color:#00e676;">●</span> SCENARIO 1 / 3
     </div>
   </div>
-  <div id="tactical-banner">Cutback Cross & Box Domination</div>
+  <div id="tactical-banner">Through-balls & Box Penetration</div>
   <canvas id="overlay-canvas" width="720" height="740"></canvas>
-  <div id="status-bubble">Swipe to shoot immediately or bend a pass to your teammate!</div>
+  <div id="status-bubble">Lead your teammate into open space or curl it past the keeper!</div>
 </div>
 
 <div id="btn-bar">
@@ -199,7 +199,7 @@ const HEIGHT = 740;
 const container = document.getElementById('container');
 const scene = new THREE.Scene();
 
-// Atmosphere & Sky
+// Broadcast atmospheric sky
 scene.background = new THREE.Color(0x0e141d);
 scene.fog = new THREE.FogExp2(0x0e141d, 0.009);
 
@@ -216,11 +216,11 @@ container.appendChild(renderer.domElement);
 const overlay = document.getElementById('overlay-canvas');
 const ctx = overlay.getContext('2d');
 
-// Lighting: 4 Stadium Floodlights + Sun fill
+// Lighting: Stadium Floodlights
 const hemiLight = new THREE.HemisphereLight(0xe8f0f8, 0x1b301c, 0.55);
 scene.add(hemiLight);
 
-const mainFlood = new THREE.DirectionalLight(0xffffff, 1.1);
+const mainFlood = new THREE.DirectionalLight(0xffffff, 1.15);
 mainFlood.position.set(25, 45, 10);
 mainFlood.castShadow = true;
 mainFlood.shadow.mapSize.width = 2048;
@@ -238,7 +238,7 @@ const fillLight = new THREE.DirectionalLight(0x7ea0d4, 0.45);
 fillLight.position.set(-30, 30, -25);
 scene.add(fillLight);
 
-// Procedural Grass & Striping Texture
+// Grass Texture with micro noise
 function createGrassTexture() {
   const c = document.createElement('canvas');
   c.width = 512;
@@ -247,7 +247,6 @@ function createGrassTexture() {
   cx.fillStyle = '#2b7a32';
   cx.fillRect(0, 0, 512, 512);
 
-  // Micro blade noise
   for (let i = 0; i < 40000; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
@@ -262,7 +261,7 @@ function createGrassTexture() {
   return tex;
 }
 
-// Procedural Football Texture (Pentagons)
+// Procedural Football Texture
 function createBallTexture() {
   const c = document.createElement('canvas');
   c.width = 512;
@@ -327,7 +326,7 @@ function buildPitchLines() {
     scene.add(new THREE.Line(geo, lineMat));
   }
 
-  // 18-yard box (x: -18 to 18, z: -45 to -27)
+  // 18-yard box
   addPoly([
     new THREE.Vector3(-18, 0.05, -45),
     new THREE.Vector3(-18, 0.05, -27),
@@ -363,56 +362,121 @@ function buildPitchLines() {
 }
 buildPitchLines();
 
-// Realistic 3D Goal with Hexagonal Net
+// ==========================================
+// REALISTIC HEXAGONAL / WOVEN GOAL NET
+// ==========================================
+function createNetTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+  ctx.fillRect(0, 0, 64, 64);
+  
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  // Diamond / Hex net mesh weave
+  ctx.moveTo(32, 0); ctx.lineTo(64, 32); ctx.lineTo(32, 64); ctx.lineTo(0, 32); ctx.closePath();
+  ctx.stroke();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(28, 14);
+  return texture;
+}
+
 const goalWidth = 14.2;
 const goalHeight = 4.4;
+const goalDepth = 3.6;
 const goalZ = -45;
 const goalGroup = new THREE.Group();
 
 const postMat = new THREE.MeshStandardMaterial({
-  color: 0xf5f5f5,
-  metalness: 0.4,
+  color: 0xf2f4f8,
+  metalness: 0.45,
   roughness: 0.25
 });
 const pRadius = 0.16;
 
-const postL = new THREE.Mesh(new THREE.CylinderGeometry(pRadius, pRadius, goalHeight, 20), postMat);
+// Front Frame
+const postL = new THREE.Mesh(new THREE.CylinderGeometry(pRadius, pRadius, goalHeight, 24), postMat);
 postL.position.set(-goalWidth / 2, goalHeight / 2, goalZ);
 postL.castShadow = true;
 goalGroup.add(postL);
 
-const postR = new THREE.Mesh(new THREE.CylinderGeometry(pRadius, pRadius, goalHeight, 20), postMat);
+const postR = new THREE.Mesh(new THREE.CylinderGeometry(pRadius, pRadius, goalHeight, 24), postMat);
 postR.position.set(goalWidth / 2, goalHeight / 2, goalZ);
 postR.castShadow = true;
 goalGroup.add(postR);
 
-const bar = new THREE.Mesh(new THREE.CylinderGeometry(pRadius, pRadius, goalWidth, 20), postMat);
+const bar = new THREE.Mesh(new THREE.CylinderGeometry(pRadius, pRadius, goalWidth, 24), postMat);
 bar.rotation.z = Math.PI / 2;
 bar.position.set(0, goalHeight, goalZ);
 bar.castShadow = true;
 goalGroup.add(bar);
 
-// Back support bars
-const backBarL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.5), postMat);
-backBarL.position.set(-goalWidth/2, 2.2, goalZ - 2.2);
-backBarL.rotation.x = Math.PI / 4;
-goalGroup.add(backBarL);
+// Back Support Stanchions (Modern European stadium goal tension poles)
+const stanchionMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
+const stanchionL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 5.8), stanchionMat);
+stanchionL.position.set(-goalWidth/2 - 0.4, 2.3, goalZ - goalDepth - 0.5);
+stanchionL.rotation.x = -0.25;
+goalGroup.add(stanchionL);
 
-const backBarR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.5), postMat);
-backBarR.position.set(goalWidth/2, 2.2, goalZ - 2.2);
-backBarR.rotation.x = Math.PI / 4;
-goalGroup.add(backBarR);
+const stanchionR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 5.8), stanchionMat);
+stanchionR.position.set(goalWidth/2 + 0.4, 2.3, goalZ - goalDepth - 0.5);
+stanchionR.rotation.x = -0.25;
+goalGroup.add(stanchionR);
 
-// Realistic Goal Netting
-const netMat = new THREE.MeshBasicMaterial({
-  color: 0xcccccc,
-  wireframe: true,
+// Realistic draped net canopy
+const netTexture = createNetTexture();
+const netCanopyMat = new THREE.MeshStandardMaterial({
+  map: netTexture,
   transparent: true,
-  opacity: 0.35
+  opacity: 0.75,
+  roughness: 0.8,
+  side: THREE.DoubleSide,
+  alphaTest: 0.05
 });
-const netBox = new THREE.Mesh(new THREE.BoxGeometry(goalWidth, goalHeight, 3.8), netMat);
-netBox.position.set(0, goalHeight / 2, goalZ - 1.9);
-goalGroup.add(netBox);
+
+// Net geometry with realistic roof slope and side panels
+// 1. Back Wall
+const backNetGeo = new THREE.PlaneGeometry(goalWidth, goalHeight);
+const backNet = new THREE.Mesh(backNetGeo, netCanopyMat);
+backNet.position.set(0, goalHeight / 2, goalZ - goalDepth);
+goalGroup.add(backNet);
+
+// 2. Net Roof (Slight sag in middle)
+const roofNetGeo = new THREE.PlaneGeometry(goalWidth, goalDepth, 10, 10);
+// Apply subtle organic sag to vertices
+const posAttr = roofNetGeo.attributes.position;
+for (let i = 0; i < posAttr.count; i++) {
+  const y = posAttr.getY(i);
+  const x = posAttr.getX(i);
+  // sagging paraboloid
+  const sag = (1 - (x / (goalWidth / 2)) ** 2) * (1 - (y / (goalDepth / 2)) ** 2) * 0.22;
+  posAttr.setZ(i, posAttr.getZ(i) - sag);
+}
+roofNetGeo.computeVertexNormals();
+const roofNet = new THREE.Mesh(roofNetGeo, netCanopyMat);
+roofNet.rotation.x = Math.PI / 2;
+roofNet.position.set(0, goalHeight - 0.05, goalZ - goalDepth / 2);
+goalGroup.add(roofNet);
+
+// 3. Left & Right Net Walls
+const sideNetGeoL = new THREE.PlaneGeometry(goalDepth, goalHeight);
+const sideNetL = new THREE.Mesh(sideNetGeoL, netCanopyMat);
+sideNetL.rotation.y = Math.PI / 2;
+sideNetL.position.set(-goalWidth / 2, goalHeight / 2, goalZ - goalDepth / 2);
+goalGroup.add(sideNetL);
+
+const sideNetGeoR = new THREE.PlaneGeometry(goalDepth, goalHeight);
+const sideNetR = new THREE.Mesh(sideNetGeoR, netCanopyMat);
+sideNetR.rotation.y = -Math.PI / 2;
+sideNetR.position.set(goalWidth / 2, goalHeight / 2, goalZ - goalDepth / 2);
+goalGroup.add(sideNetR);
+
 scene.add(goalGroup);
 
 // Ball Mesh with Physics Rig
@@ -427,42 +491,36 @@ const ballMesh = new THREE.Mesh(ballGeo, ballMat);
 ballMesh.castShadow = true;
 scene.add(ballMesh);
 
-// Player Builder: Proportioned Rig with Limbs, Head, Hair & Boots
+// Player Builder: Proportioned Rig
 function createRealisticPlayer(primaryColor, shortsColor, skinColor=0xf5c39e, isGK=false) {
   const root = new THREE.Group();
 
-  // Materials
   const jerseyMat = new THREE.MeshStandardMaterial({ color: primaryColor, roughness: 0.6 });
   const shortsMat = new THREE.MeshStandardMaterial({ color: shortsColor, roughness: 0.65 });
   const skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.8 });
   const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
   const sockMat = new THREE.MeshStandardMaterial({ color: primaryColor, roughness: 0.7 });
 
-  // Pelvis / Hips
   const hips = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.35, 0.4, 16), shortsMat);
   hips.position.y = 1.6;
   hips.castShadow = true;
   root.add(hips);
 
-  // Chest / Torso
   const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 0.85, 16), jerseyMat);
   chest.position.y = 2.15;
   chest.castShadow = true;
   root.add(chest);
 
-  // Neck & Head
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 16), skinMat);
   head.position.y = 2.82;
   head.castShadow = true;
   root.add(head);
 
-  // Hair
   const hairMat = new THREE.MeshStandardMaterial({ color: isGK ? 0x2b1c11 : 0xd4a359, roughness: 0.9 });
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), hairMat);
   hair.position.y = 2.88;
   root.add(hair);
 
-  // Arms (Jointed)
   function createArm(isLeft) {
     const armGroup = new THREE.Group();
     const sign = isLeft ? -1 : 1;
@@ -480,7 +538,6 @@ function createRealisticPlayer(primaryColor, shortsColor, skinColor=0xf5c39e, is
     armGroup.add(forearm);
 
     if (isGK) {
-      // Goalkeeper Gloves
       const glove = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), new THREE.MeshStandardMaterial({ color: 0x00ff88 }));
       glove.position.set(0, -0.9, 0.08);
       armGroup.add(glove);
@@ -495,7 +552,6 @@ function createRealisticPlayer(primaryColor, shortsColor, skinColor=0xf5c39e, is
   root.leftArm = leftArm;
   root.rightArm = rightArm;
 
-  // Legs (Jointed)
   function createLeg(isLeft) {
     const legGroup = new THREE.Group();
     const sign = isLeft ? -1 : 1;
@@ -532,9 +588,9 @@ function createRealisticPlayer(primaryColor, shortsColor, skinColor=0xf5c39e, is
 // Scenarios setup
 const SCENARIOS = [
   {
-    title: "1. Flank Overload & Box Finish",
+    title: "1. Flank Overload & Through-ball",
     match: "1 - 0",
-    banner: "Ørjasæter crosses or strikes; Weghorst attacks far post",
+    banner: "Lead Weghorst into space or test the keeper early",
     orjasaeterPos: { x: -14, z: -12 },
     orjasaeterRun: { x: -8, z: -25, speed: 0.04 },
     weghorstPos: { x: 3, z: -15 },
@@ -548,7 +604,7 @@ const SCENARIOS = [
   {
     title: "2. Weghorst Target Hold-Up",
     match: "1 - 1",
-    banner: "Wout holds up center-backs; lay off to Sondre or spin & shoot",
+    banner: "Slide Sondre behind the defense or turn & finish",
     orjasaeterPos: { x: -16, z: -8 },
     orjasaeterRun: { x: -6, z: -27, speed: 0.05 },
     weghorstPos: { x: 0, z: -16 },
@@ -563,7 +619,7 @@ const SCENARIOS = [
   {
     title: "3. Stoppage-Time Decider",
     match: "2 - 2",
-    banner: "90+2' Counter: Unlimited 1-2 passing combinations",
+    banner: "90+2' Winner: Through-balls into channels & curl into corners",
     orjasaeterPos: { x: 13, z: -6 },
     orjasaeterRun: { x: 6, z: -29, speed: 0.055 },
     weghorstPos: { x: -4, z: -12 },
@@ -581,12 +637,12 @@ let scenarioIdx = 0;
 let currentScenario = null;
 let activePossessor = 'orjasaeter';
 
-// Realistic 3D Players
-const orjasaeterMesh = createRealisticPlayer(0xcc0000, 0xffffff); // Red jersey, white shorts
+// 3D Players
+const orjasaeterMesh = createRealisticPlayer(0xcc0000, 0xffffff);
 const weghorstMesh = createRealisticPlayer(0xcc0000, 0xffffff);
-weghorstMesh.scale.set(1.08, 1.08, 1.08); // Weghorst is 1.97m tall physical presence
+weghorstMesh.scale.set(1.08, 1.08, 1.08);
 
-// Heerenveen Keeper: Bright fluo jersey + black shorts
+// Heerenveen Keeper
 const keeperMesh = createRealisticPlayer(0x00ff77, 0x111111, 0xdfb490, true);
 
 scene.add(orjasaeterMesh);
@@ -595,20 +651,26 @@ scene.add(keeperMesh);
 
 let defenderMeshes = [];
 
-// Reactive Goalkeeper State
+// ==========================================
+// BALANCED GOALKEEPER AI (REALISTIC DEFICIT)
+// ==========================================
 const gkState = {
   homeX: 0,
-  homeZ: -43.2,
+  homeZ: -43.5,
   currentX: 0,
   currentY: 0,
-  currentZ: -43.2,
-  vx: 0,
-  vy: 0,
+  currentZ: -43.5,
   isDiving: false,
   diveProgress: 0,
+  reactionDelay: 0.18, // Human latency (180ms delay before beginning dive)
+  timeSinceShot: 0,
   targetX: 0,
   targetY: 0
 };
+
+// Player Sprint/Chasing Loose Ball State
+let looseBallChaser = null; // 'orjasaeter' or 'weghorst'
+let isChasingLooseBall = false;
 
 // Ball Trajectory State
 let ball3D = { x: 0, y: ballRadius, z: 0 };
@@ -628,11 +690,9 @@ function loadScenario(idx) {
   currentScenario = JSON.parse(JSON.stringify(SCENARIOS[scenarioIdx]));
   activePossessor = currentScenario.initialPossessor;
 
-  // Clear previous defenders
   defenderMeshes.forEach(d => scene.remove(d.mesh));
   defenderMeshes = [];
 
-  // Spawn Heerenveen (Blue/White striped colors)
   currentScenario.defenders.forEach(def => {
     const mesh = createRealisticPlayer(0x0a4ab8, 0xffffff);
     mesh.position.set(def.x, 0, def.z);
@@ -650,12 +710,13 @@ function loadScenario(idx) {
 
   // Reset Goalkeeper state
   gkState.homeX = 0;
-  gkState.homeZ = -43.2;
+  gkState.homeZ = -43.5;
   gkState.currentX = 0;
   gkState.currentY = 0;
-  gkState.currentZ = -43.2;
+  gkState.currentZ = -43.5;
   gkState.isDiving = false;
   gkState.diveProgress = 0;
+  gkState.timeSinceShot = 0;
   keeperMesh.position.set(0, 0, gkState.homeZ);
   keeperMesh.rotation.set(0, 0, 0);
 
@@ -663,13 +724,15 @@ function loadScenario(idx) {
   orjasaeterMesh.position.set(currentScenario.orjasaeterPos.x, 0, currentScenario.orjasaeterPos.z);
   weghorstMesh.position.set(currentScenario.weghorstPos.x, 0, currentScenario.weghorstPos.z);
 
+  looseBallChaser = null;
+  isChasingLooseBall = false;
+
   snapBallToCarrier();
 
   isBallInFlight = false;
   flightTrajectory = [];
   gesturePoints = [];
 
-  // Update HUD
   document.getElementById('hud-scenario').innerHTML = `<span style="color:#00e676;">●</span> SCENARIO ${scenarioIdx + 1} / ${SCENARIOS.length}`;
   document.getElementById('hud-score').innerText = currentScenario.match;
   document.getElementById('tactical-banner').innerText = currentScenario.banner;
@@ -687,7 +750,7 @@ function snapBallToCarrier() {
 function updateStatusInstruction() {
   const activeName = activePossessor === 'orjasaeter' ? "Sondre Ørjasæter (11)" : "Wout Weghorst (9)";
   const partner = activePossessor === 'orjasaeter' ? "Weghorst" : "Ørjasæter";
-  setStatus(`⚽ ${activeName} on the ball. Swipe towards goal or pass back to ${partner}!`, "#ffffff");
+  setStatus(`⚽ ${activeName} on the ball. Lead ${partner} into space or curl it past the keeper!`, "#ffffff");
 }
 
 function retryScenario() {
@@ -723,7 +786,7 @@ let isSwiping = false;
 let gesturePoints = [];
 
 container.addEventListener('mousedown', (e) => {
-  if (isBallInFlight) return;
+  if (isBallInFlight || isChasingLooseBall) return;
   const rect = container.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
@@ -758,7 +821,6 @@ window.addEventListener('mouseup', () => {
   }
 });
 
-// Convert Swipe to 3D Parabolic Curve & Signal Goalkeeper
 function launchBallAlongGesture() {
   flightTrajectory = [];
   const total = gesturePoints.length;
@@ -769,8 +831,7 @@ function launchBallAlongGesture() {
     if (!wPt) continue;
 
     const t = i / (total - 1);
-    // Parabolic height arc
-    const arcHeight = 3.2 * Math.sin(t * Math.PI);
+    const arcHeight = 3.0 * Math.sin(t * Math.PI);
 
     flightTrajectory.push({
       x: wPt.x,
@@ -779,7 +840,6 @@ function launchBallAlongGesture() {
     });
   }
 
-  // Smooth interpolation
   const refined = [];
   for (let i = 0; i < flightTrajectory.length - 1; i++) {
     const p1 = flightTrajectory[i];
@@ -801,38 +861,63 @@ function launchBallAlongGesture() {
   isBallInFlight = true;
   gesturePoints = [];
 
-  // Reactive Goalkeeper AI Decision
+  // Check if ball was played into open space towards the non-carrier
+  checkIfLeadPassIntoSpace();
+
+  // Setup GK Reaction
   predictAndTriggerKeeperReaction();
 }
 
-// Reactive Goalkeeper AI: Intercept calculation
+// Recognize Through-Balls into Space
+function checkIfLeadPassIntoSpace() {
+  const endPt = flightTrajectory[flightTrajectory.length - 1];
+  
+  // If not aimed straight at the goal net
+  const isAimedAtGoal = endPt.z <= -42 && Math.abs(endPt.x) < (goalWidth / 2 + 1.0);
+  if (!isAimedAtGoal) {
+    const targetPlayerKey = activePossessor === 'orjasaeter' ? 'weghorst' : 'orjasaeter';
+    const targetMesh = targetPlayerKey === 'weghorst' ? weghorstMesh : orjasaeterMesh;
+    
+    // If the landing spot is reachable by the teammate within reasonable sprint distance
+    const distToTarget = Math.hypot(endPt.x - targetMesh.position.x, endPt.z - targetMesh.position.z);
+    if (distToTarget < 18.0) {
+      looseBallChaser = targetPlayerKey;
+      isChasingLooseBall = true;
+      const chaserName = looseBallChaser === 'orjasaeter' ? "Ørjasæter" : "Weghorst";
+      setStatus(`🏃 Through-ball in space! ${chaserName} is sprinting onto the loose ball!`, "#00ffea");
+    }
+  }
+}
+
+// Goalkeeper Decision (Slightly slower reactions & humane coverage)
 function predictAndTriggerKeeperReaction() {
-  // Find where the trajectory crosses the goal line plane (z = -45)
   let arrivalPoint = null;
   for (let i = 0; i < flightTrajectory.length; i++) {
     const pt = flightTrajectory[i];
-    if (pt.z <= -43.0) {
+    if (pt.z <= -43.2) {
       arrivalPoint = pt;
       break;
     }
   }
 
-  if (arrivalPoint && Math.abs(arrivalPoint.x) < (goalWidth / 2 + 1.5)) {
-    // Shot is headed towards the net!
-    gkState.targetX = THREE.MathUtils.clamp(arrivalPoint.x, -goalWidth / 2 + 0.5, goalWidth / 2 - 0.5);
-    gkState.targetY = THREE.MathUtils.clamp(arrivalPoint.y, 0, goalHeight - 0.2);
+  gkState.timeSinceShot = 0;
+
+  if (arrivalPoint && Math.abs(arrivalPoint.x) < (goalWidth / 2 + 0.8)) {
+    // Shot headed on goal: Goalkeeper predicts arrival but will have a 180ms reflex delay
+    // He dives with human limits, making tight corner shots score cleanly!
+    gkState.targetX = THREE.MathUtils.clamp(arrivalPoint.x * 0.82, -goalWidth / 2 + 1.2, goalWidth / 2 - 1.2);
+    gkState.targetY = THREE.MathUtils.clamp(arrivalPoint.y * 0.75, 0, goalHeight - 0.7);
     gkState.isDiving = true;
     gkState.diveProgress = 0;
   } else {
-    // Pass or wide shot - GK repositions subtly to cut the near post angle
+    // Cross or through-ball: GK adjusts conservatively
     const last = flightTrajectory[flightTrajectory.length - 1];
-    gkState.targetX = THREE.MathUtils.clamp(last.x * 0.25, -3, 3);
+    gkState.targetX = THREE.MathUtils.clamp(last.x * 0.18, -2.5, 2.5);
     gkState.targetY = 0;
     gkState.isDiving = false;
   }
 }
 
-// Animation Clock & Game Tick
 const clock = new THREE.Clock();
 
 function animate() {
@@ -840,10 +925,10 @@ function animate() {
   const delta = clock.getDelta();
   const elapsed = clock.getElapsedTime();
 
-  // 1. Reactive Goalkeeper Physics & Animation
+  // 1. Goalkeeper Physics & AI
   updateGoalkeeperAI(delta, elapsed);
 
-  // 2. Animate Heerenveen Defenders (Zonal patrol & limb swing)
+  // 2. Defenders Movement
   defenderMeshes.forEach(d => {
     d.mesh.position.x += d.speed * d.dir;
     if (Math.abs(d.mesh.position.x - d.startX) > d.patrol) {
@@ -853,25 +938,38 @@ function animate() {
     d.mesh.rightLeg.rotation.x = -Math.sin(elapsed * 7) * 0.35;
   });
 
-  // 3. Dynamic Forward Runs for Attacking Players
+  // 3. Dynamic Player Movement & Loose Ball Sprinting
   if (currentScenario) {
-    if (activePossessor !== 'orjasaeter' || isBallInFlight) {
-      const tgt = currentScenario.orjasaeterRun;
-      orjasaeterMesh.position.x += (tgt.x - orjasaeterMesh.position.x) * tgt.speed;
-      orjasaeterMesh.position.z += (tgt.z - orjasaeterMesh.position.z) * tgt.speed;
-      orjasaeterMesh.leftLeg.rotation.x = Math.sin(elapsed * 9) * 0.45;
-      orjasaeterMesh.rightLeg.rotation.x = -Math.sin(elapsed * 9) * 0.45;
-    }
-    if (activePossessor !== 'weghorst' || isBallInFlight) {
-      const tgt = currentScenario.weghorstRun;
-      weghorstMesh.position.x += (tgt.x - weghorstMesh.position.x) * tgt.speed;
-      weghorstMesh.position.z += (tgt.z - weghorstMesh.position.z) * tgt.speed;
-      weghorstMesh.leftLeg.rotation.x = Math.sin(elapsed * 8) * 0.4;
-      weghorstMesh.rightLeg.rotation.x = -Math.sin(elapsed * 8) * 0.4;
+    // Sprint to through-ball in space
+    if (isChasingLooseBall && flightTrajectory.length > 0) {
+      const targetPos = flightTrajectory[flightTrajectory.length - 1];
+      const chaserMesh = looseBallChaser === 'orjasaeter' ? orjasaeterMesh : weghorstMesh;
+      const sprintSpeed = looseBallChaser === 'orjasaeter' ? 0.085 : 0.075; // Ørjasæter is pacey, Weghorst strides
+
+      chaserMesh.position.x += (targetPos.x - chaserMesh.position.x) * sprintSpeed;
+      chaserMesh.position.z += (targetPos.z - chaserMesh.position.z) * sprintSpeed;
+      chaserMesh.leftLeg.rotation.x = Math.sin(elapsed * 12) * 0.55;
+      chaserMesh.rightLeg.rotation.x = -Math.sin(elapsed * 12) * 0.55;
+    } else {
+      // Standard tactical runs without ball
+      if (activePossessor !== 'orjasaeter' || isBallInFlight) {
+        const tgt = currentScenario.orjasaeterRun;
+        orjasaeterMesh.position.x += (tgt.x - orjasaeterMesh.position.x) * tgt.speed;
+        orjasaeterMesh.position.z += (tgt.z - orjasaeterMesh.position.z) * tgt.speed;
+        orjasaeterMesh.leftLeg.rotation.x = Math.sin(elapsed * 9) * 0.45;
+        orjasaeterMesh.rightLeg.rotation.x = -Math.sin(elapsed * 9) * 0.45;
+      }
+      if (activePossessor !== 'weghorst' || isBallInFlight) {
+        const tgt = currentScenario.weghorstRun;
+        weghorstMesh.position.x += (tgt.x - weghorstMesh.position.x) * tgt.speed;
+        weghorstMesh.position.z += (tgt.z - weghorstMesh.position.z) * tgt.speed;
+        weghorstMesh.leftLeg.rotation.x = Math.sin(elapsed * 8) * 0.4;
+        weghorstMesh.rightLeg.rotation.x = -Math.sin(elapsed * 8) * 0.4;
+      }
     }
   }
 
-  // 4. Ball Flight & Reactive Interception Checking
+  // 4. Ball In-Flight & Collision
   if (isBallInFlight && flightTrajectory.length > 0) {
     flightProgress += 2;
     if (flightProgress < flightTrajectory.length) {
@@ -880,46 +978,64 @@ function animate() {
       ballMesh.rotation.x -= 0.25;
       ballMesh.rotation.z += 0.08;
 
-      // Defender Interceptions (low trajectory only)
-      if (cur.y < 1.7) {
+      // Defender Interceptions
+      if (cur.y < 1.6) {
         for (const def of defenderMeshes) {
           const dDist = Math.hypot(cur.x - def.mesh.position.x, cur.z - def.mesh.position.z);
-          if (dDist < 1.35) {
+          if (dDist < 1.3) {
             isBallInFlight = false;
-            setStatus("❌ Heerenveen defender clears the danger! Try bending it wide.", "#ff5555");
+            isChasingLooseBall = false;
+            setStatus("❌ Heerenveen defender clears the danger! Try a wider pass or loft it over.", "#ff5555");
             setTimeout(retryScenario, 1300);
             return;
           }
         }
       }
 
-      // Dynamic Goalkeeper Save Check (based on actual glove/hand reach in 3D)
+      // Goalkeeper Save Check (Balanced down: hitbox reduced from 1.75 to 1.15)
       const distToGK = Math.hypot(cur.x - keeperMesh.position.x, cur.y - (keeperMesh.position.y + 1.8), cur.z - keeperMesh.position.z);
-      if (distToGK < 1.75 && cur.z < -42.2) {
+      if (distToGK < 1.15 && cur.z < -42.6) {
         isBallInFlight = false;
-        setStatus("🧤 SENSATIONAL SAVE! The keeper leaped to tip it away!", "#ffb700");
-        setTimeout(retryScenario, 1400);
+        isChasingLooseBall = false;
+        setStatus("🧤 Saved by the keeper! Aim closer towards the side netting!", "#ffb700");
+        setTimeout(retryScenario, 1300);
         return;
       }
 
     } else {
-      // End of flight
+      // Reached End of Trajectory
       isBallInFlight = false;
       const endPos = flightTrajectory[flightTrajectory.length - 1];
 
-      // Direct Goal Evaluation
+      // A) Direct Goal in the Net
       const inGoalX = endPos.x > -goalWidth / 2 + 0.3 && endPos.x < goalWidth / 2 - 0.3;
       const inGoalZ = endPos.z <= -44.5;
       const inGoalY = endPos.y <= goalHeight + 0.2;
 
       if (inGoalX && inGoalZ && inGoalY) {
+        isChasingLooseBall = false;
         const scorer = activePossessor === 'orjasaeter' ? "Sondre Ørjasæter" : "Wout Weghorst";
-        setStatus(`⚽ GOOOAL FOR FC TWENTE! What a finish by ${scorer}!`, "#00ff77");
+        setStatus(`⚽ GOOOAL FOR FC TWENTE! Stunner by ${scorer}!`, "#00ff77");
         celebrationCounter = 85;
         return;
       }
 
-      // Check Pass Completion to Ørjasæter
+      // B) Loose Ball Chased & Gathered in Space!
+      if (isChasingLooseBall) {
+        const chaserMesh = looseBallChaser === 'orjasaeter' ? orjasaeterMesh : weghorstMesh;
+        const distChaser = Math.hypot(endPos.x - chaserMesh.position.x, endPos.z - chaserMesh.position.z);
+        if (distChaser < 4.2) {
+          activePossessor = looseBallChaser;
+          isChasingLooseBall = false;
+          snapBallToCarrier();
+          const pName = activePossessor === 'orjasaeter' ? "Ørjasæter" : "Weghorst";
+          const other = activePossessor === 'orjasaeter' ? "Weghorst" : "Ørjasæter";
+          setStatus(`🎯 Great through-ball! ${pName} runs onto it in space! Finish or pass back to ${other}!`, "#00ff77");
+          return;
+        }
+      }
+
+      // C) Direct Pass Completion to Feet
       const distOrj = Math.hypot(endPos.x - orjasaeterMesh.position.x, endPos.z - orjasaeterMesh.position.z);
       if (distOrj < 3.2 && activePossessor !== 'orjasaeter') {
         activePossessor = 'orjasaeter';
@@ -928,7 +1044,6 @@ function animate() {
         return;
       }
 
-      // Check Pass Completion to Weghorst
       const distWeg = Math.hypot(endPos.x - weghorstMesh.position.x, endPos.z - weghorstMesh.position.z);
       if (distWeg < 3.4 && activePossessor !== 'weghorst') {
         activePossessor = 'weghorst';
@@ -937,7 +1052,9 @@ function animate() {
         return;
       }
 
-      setStatus("❌ Shot off target or pass misplaced. Retrying...", "#ff7777");
+      // D) Missed everything
+      isChasingLooseBall = false;
+      setStatus("❌ Overhit pass or shot missed the target. Retrying...", "#ff7777");
       setTimeout(retryScenario, 1100);
     }
   }
@@ -959,35 +1076,36 @@ function animate() {
   renderOverlay();
 }
 
-// Dedicated Reactive Keeper Physics Engine
+// Goalkeeper Movement with Realistic Reaction Lag & Calibrated Reach
 function updateGoalkeeperAI(delta, elapsed) {
   if (gkState.isDiving) {
-    gkState.diveProgress = Math.min(1.0, gkState.diveProgress + delta * 2.8);
-    const ease = Math.sin(gkState.diveProgress * Math.PI * 0.5);
+    gkState.timeSinceShot += delta;
+    
+    // Human reaction delay before dive starts
+    if (gkState.timeSinceShot > gkState.reactionDelay) {
+      gkState.diveProgress = Math.min(1.0, gkState.diveProgress + delta * 2.1); // Slightly slower dive speed
+      const ease = Math.sin(gkState.diveProgress * Math.PI * 0.5);
 
-    // Spring/Leap towards predicted intercept
-    keeperMesh.position.x = THREE.MathUtils.lerp(gkState.homeX, gkState.targetX, ease);
-    keeperMesh.position.y = Math.sin(gkState.diveProgress * Math.PI) * (gkState.targetY * 0.6);
+      keeperMesh.position.x = THREE.MathUtils.lerp(gkState.homeX, gkState.targetX, ease);
+      keeperMesh.position.y = Math.sin(gkState.diveProgress * Math.PI) * (gkState.targetY * 0.5);
 
-    // Dynamic diving body tilt & outstretched arms
-    const diveDir = Math.sign(gkState.targetX - gkState.homeX) || 1;
-    keeperMesh.rotation.z = -diveDir * ease * 1.15;
-    keeperMesh.leftArm.rotation.z = -diveDir * 1.6;
-    keeperMesh.rightArm.rotation.z = -diveDir * 1.6;
-
+      const diveDir = Math.sign(gkState.targetX - gkState.homeX) || 1;
+      keeperMesh.rotation.z = -diveDir * ease * 1.05;
+      keeperMesh.leftArm.rotation.z = -diveDir * 1.4;
+      keeperMesh.rightArm.rotation.z = -diveDir * 1.4;
+    }
   } else {
-    // Lateral shuffle positioning
-    keeperMesh.position.x = THREE.MathUtils.lerp(keeperMesh.position.x, gkState.targetX, 0.08);
+    // Standard subtle shuffle
+    keeperMesh.position.x = THREE.MathUtils.lerp(keeperMesh.position.x, gkState.targetX, 0.06);
     keeperMesh.position.y = THREE.MathUtils.lerp(keeperMesh.position.y, 0, 0.1);
     keeperMesh.rotation.z = THREE.MathUtils.lerp(keeperMesh.rotation.z, 0, 0.15);
 
-    // Ready stance idle animation
     keeperMesh.leftArm.rotation.x = Math.sin(elapsed * 4) * 0.15 + 0.4;
     keeperMesh.rightArm.rotation.x = Math.sin(elapsed * 4) * 0.15 + 0.4;
   }
 }
 
-// 2D Tactical Overlay & Swipe Arc
+// 2D Tactical Overlay
 function renderOverlay() {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
@@ -997,7 +1115,6 @@ function renderOverlay() {
     ctx.font = '800 11px sans-serif';
     ctx.textAlign = 'center';
     
-    // Background pill
     const txt = `${number} ${name}`;
     const tw = ctx.measureText(txt).width + 14;
     ctx.fillStyle = 'rgba(10, 14, 20, 0.85)';
@@ -1013,11 +1130,11 @@ function renderOverlay() {
     ctx.restore();
   }
 
-  drawPlayerBadge(orjasaeterMesh, "Ørjasæter", "27", "#ff3333");
+  drawPlayerBadge(orjasaeterMesh, "Ørjasæter", "11", "#ff3333");
   drawPlayerBadge(weghorstMesh, "Weghorst", "9", "#ff3333");
   drawPlayerBadge(keeperMesh, "Heerenveen GK", "1", "#00ff88");
 
-  // Pulsing Target Pass Ring
+  // Highlight available target pass ring
   const targetMesh = activePossessor === 'orjasaeter' ? weghorstMesh : orjasaeterMesh;
   const ringPos = worldToScreen(new THREE.Vector3(targetMesh.position.x, 0.1, targetMesh.position.z));
   ctx.save();
@@ -1030,7 +1147,7 @@ function renderOverlay() {
   ctx.restore();
 
   // Active Ball Ready Indicator
-  if (!isBallInFlight) {
+  if (!isBallInFlight && !isChasingLooseBall) {
     const bs = worldToScreen(ballMesh.position);
     ctx.save();
     ctx.beginPath();
@@ -1067,7 +1184,6 @@ function renderOverlay() {
   }
 }
 
-// Initial Kick-off
 loadScenario(0);
 requestAnimationFrame(animate);
 </script>
@@ -1079,10 +1195,9 @@ components.html(game_html, height=830, scrolling=False)
 
 st.markdown(
     """
-    ### 🎮 Pro Broadcast & Goalkeeper Mechanics
-    * **Reactive Goalkeeper AI:** The goalkeeper no longer patrols like a pendulum. When you release a shot, the AI calculates the arrival trajectory at the goal plane and physically dives or leaps toward the top/bottom corners.
-    * **Beating the Keeper:** To score, bend the ball with severe curl away from his reach into the side netting or dip it over his outstretched gloves.
-    * **Realistic 3D Rigs:** Authentic proportions, kit numbers (**27 Ørjasæter** and **9 Weghorst**), multi-jointed arms/legs, and procedural pitch bump textures.
-    * **Fluid Freedom:** Retain full freedom to pass back and forth between Weghorst and Ørjasæter or strike directly on goal at any moment.
+    ### 🎮 Upgraded Mechanics:
+    * **Balanced Goalkeeper:** Humanized with a 180ms reflex delay and a realistic 1.15m catch radius. Well-placed shots into the top corners or side netting will consistently beat him!
+    * **Lead Passes / Running into Space:** You no longer need to pass directly to a player's feet. If you curl a ball into open turf ahead of **Ørjasæter** or **Weghorst**, they will sprint to collect the through-ball and maintain possession.
+    * **Woven Stadium Net:** Features deep-box European netting with diamond weave textures, dual back stanchions, and vertex canopy sagging.
     """
 )
